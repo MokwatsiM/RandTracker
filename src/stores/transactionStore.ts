@@ -3,6 +3,7 @@ import { endOfMonth, startOfMonth } from 'date-fns';
 import type { Transaction } from '@/lib/db/schema';
 import {
   createTransactionRecord,
+  createTransactionRecords,
   fetchTransactions,
   fetchTransactionsByDateRange,
   softDeleteTransactionRecord,
@@ -11,10 +12,25 @@ import {
 import { useAccountStore } from '@/stores/accountStore';
 import { useDebtStore } from '@/stores/debtStore';
 
+type NewTransaction = Omit<Transaction, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>;
+
+// Most pages need the whole list, and each one asks for it when it opens. Changes made in
+// this browser update the list directly, so it's only downloaded again once it's this old,
+// or when something else (another device, recurring processing) may have changed it.
+const RELOAD_AFTER_MS = 2 * 60 * 1000;
+
+async function reloadBalances(userId: string) {
+  await Promise.all([
+    useAccountStore.getState().loadAccounts(userId),
+    useDebtStore.getState().loadDebts(userId),
+  ]);
+}
+
 interface TransactionStore {
   transactions: Transaction[];
   isLoading: boolean;
   error: string | null;
+  loadedFor: { userId: string; at: number } | null;
   filters: {
     accountId?: string;
     categoryId?: string;
@@ -23,9 +39,10 @@ interface TransactionStore {
     endDate?: string;
     searchQuery?: string;
   };
-  loadTransactions: (userId: string) => Promise<void>;
+  loadTransactions: (userId: string, options?: { force?: boolean }) => Promise<void>;
   loadTransactionsByDateRange: (userId: string, startDate: Date, endDate: Date) => Promise<void>;
-  createTransaction: (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>) => Promise<Transaction>;
+  createTransaction: (transaction: NewTransaction) => Promise<Transaction>;
+  createTransactions: (transactions: NewTransaction[]) => Promise<Transaction[]>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   getTransactionById: (id: string) => Transaction | undefined;
@@ -41,13 +58,19 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   transactions: [],
   isLoading: false,
   error: null,
+  loadedFor: null,
   filters: {},
 
-  loadTransactions: async (userId: string) => {
+  loadTransactions: async (userId: string, options) => {
+    const loaded = get().loadedFor;
+    if (!options?.force && loaded?.userId === userId && Date.now() - loaded.at < RELOAD_AFTER_MS) {
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const transactions = await fetchTransactions(userId);
-      set({ transactions, isLoading: false });
+      set({ transactions, isLoading: false, loadedFor: { userId, at: Date.now() } });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
@@ -57,7 +80,8 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const transactions = await fetchTransactionsByDateRange(userId, startDate, endDate);
-      set({ transactions, isLoading: false });
+      // A partial list, so the next full load must not be skipped.
+      set({ transactions, isLoading: false, loadedFor: null });
     } catch (error) {
       set({ error: (error as Error).message, isLoading: false });
     }
@@ -66,10 +90,25 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   createTransaction: async (transactionData) => {
     try {
       const newTransaction = await createTransactionRecord(transactionData);
-      await useAccountStore.getState().loadAccounts(newTransaction.user_id);
-      await useDebtStore.getState().loadDebts(newTransaction.user_id);
+      await reloadBalances(newTransaction.user_id);
       set((state) => ({ transactions: [newTransaction, ...state.transactions] }));
       return newTransaction;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      throw error;
+    }
+  },
+
+  createTransactions: async (transactionsData) => {
+    try {
+      const created = await createTransactionRecords(transactionsData);
+      if (created.length > 0) {
+        await reloadBalances(created[0].user_id);
+        set((state) => ({
+          transactions: [...created, ...state.transactions].sort((a, b) => b.date.localeCompare(a.date)),
+        }));
+      }
+      return created;
     } catch (error) {
       set({ error: (error as Error).message });
       throw error;
@@ -79,8 +118,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   updateTransaction: async (id, updates) => {
     try {
       const updatedTransaction = await updateTransactionRecord(id, updates);
-      await useAccountStore.getState().loadAccounts(updatedTransaction.user_id);
-      await useDebtStore.getState().loadDebts(updatedTransaction.user_id);
+      await reloadBalances(updatedTransaction.user_id);
       set((state) => ({
         transactions: state.transactions.map((transaction) =>
           transaction.id === id ? updatedTransaction : transaction
@@ -95,8 +133,7 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
   deleteTransaction: async (id) => {
     try {
       const deletedTransaction = await softDeleteTransactionRecord(id);
-      await useAccountStore.getState().loadAccounts(deletedTransaction.user_id);
-      await useDebtStore.getState().loadDebts(deletedTransaction.user_id);
+      await reloadBalances(deletedTransaction.user_id);
       set((state) => ({
         transactions: state.transactions.filter((transaction) => transaction.id !== id),
       }));

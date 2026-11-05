@@ -65,13 +65,6 @@ export interface Transaction {
   principal_portion?: number;
   interest_portion?: number;
 
-  // Split transaction
-  splits?: {
-    category_id: string;
-    amount: number;
-    notes?: string;
-  }[];
-
   // Metadata
   attachment_url?: string;
   tags?: string[];
@@ -158,19 +151,6 @@ export interface Goal {
   is_completed: boolean;
   created_at: string;
   updated_at: string;
-}
-
-export interface SyncQueueItem {
-  id?: number;
-  user_id?: string;
-  table: string;
-  record_id: string;
-  operation: 'insert' | 'update' | 'delete';
-  data?: unknown;
-  synced: boolean;
-  created_at: string;
-  attempts?: number;
-  last_error?: string;
 }
 
 export interface UserProfile {

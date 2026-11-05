@@ -62,7 +62,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     const handleRecurringProcessed = () => {
       if (user) {
-        loadTransactions(user.id);
+        loadTransactions(user.id, { force: true });
       }
     };
 

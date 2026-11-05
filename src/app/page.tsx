@@ -26,9 +26,9 @@ export default function HomePage() {
             </div>
 
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">
-              <div className="text-4xl mb-3">📱</div>
-              <h3 className="text-xl font-semibold mb-2">Offline First</h3>
-              <p className="opacity-80">Works without internet. Your data is always accessible</p>
+              <div className="text-4xl mb-3">🔒</div>
+              <h3 className="text-xl font-semibold mb-2">Private by Design</h3>
+              <p className="opacity-80">Your figures are visible only to you, on a self-hosted server rather than a third-party cloud</p>
             </div>
 
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6">

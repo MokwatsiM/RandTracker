@@ -32,6 +32,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
   loadAccounts: async (userId: string) => {
     set({ isLoading: true, error: null });
     try {
+      await refreshAllAccountBalances();
       const accounts = await fetchAccounts(userId);
       set({ accounts, isLoading: false });
     } catch (error) {
@@ -93,14 +94,10 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
 
   getAccountsByType: (type) => get().accounts.filter((account) => account.type === type),
 
+  // Liability balances are stored as negative numbers (migration 007), so the plain sum
+  // is assets minus debts.
   getTotalBalance: () =>
-    get().accounts.reduce((total, account) => {
-      if (account.type === 'credit_card' || account.type === 'loan' || account.type === 'store_card') {
-        return total - account.current_balance;
-      }
-
-      return total  -account.current_balance   ;
-    }, 0),
+    get().accounts.reduce((total, account) => total + account.current_balance, 0),
 
   refreshBalances: async () => {
     try {
@@ -109,7 +106,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         return;
       }
 
-      await refreshAllAccountBalances(firstAccount.user_id);
+      await refreshAllAccountBalances();
       const accounts = await fetchAccounts(firstAccount.user_id);
       set({ accounts });
     } catch (error) {

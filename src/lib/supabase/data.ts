@@ -110,6 +110,25 @@ function getSupabaseClient() {
   return createClient();
 }
 
+// The API returns at most 1,000 rows per request, so longer lists are read in pages.
+const PAGE_SIZE = 1000;
+
+async function fetchAllPages<T>(
+  page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await page(from, from + PAGE_SIZE - 1);
+    if (error) {
+      throw error;
+    }
+    rows.push(...(data ?? []));
+    if (!data || data.length < PAGE_SIZE) {
+      return rows;
+    }
+  }
+}
+
 function mapUserProfile(profile: RemoteUserProfile): UserProfile {
   return {
     id: profile.id,
@@ -403,19 +422,19 @@ export async function setPrimaryAccountRecord(userId: string, id: string): Promi
 
 export async function fetchTransactions(userId: string): Promise<Transaction[]> {
   const supabase = getSupabaseClient();
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_deleted', false)
-    .order('date', { ascending: false })
-    .returns<RemoteTransaction[]>();
+  const rows = await fetchAllPages<RemoteTransaction>((from, to) =>
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .order('date', { ascending: false })
+      .order('id')
+      .range(from, to)
+      .returns<RemoteTransaction[]>()
+  );
 
-  if (error) {
-    throw error;
-  }
-
-  return (data ?? []).map(mapTransaction);
+  return rows.map(mapTransaction);
 }
 
 export async function fetchTransactionsByDateRange(
@@ -427,140 +446,36 @@ export async function fetchTransactionsByDateRange(
   const start = startDate.toISOString().split('T')[0];
   const end = endDate.toISOString().split('T')[0];
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('is_deleted', false)
-    .gte('date', start)
-    .lte('date', end)
-    .order('date', { ascending: false })
-    .returns<RemoteTransaction[]>();
+  const rows = await fetchAllPages<RemoteTransaction>((from, to) =>
+    supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_deleted', false)
+      .gte('date', start)
+      .lte('date', end)
+      .order('date', { ascending: false })
+      .order('id')
+      .range(from, to)
+      .returns<RemoteTransaction[]>()
+  );
 
+  return rows.map(mapTransaction);
+}
+
+// Balances are kept up to date by the database (migration 010). This also brings in
+// transactions dated in the future once their date arrives.
+export async function refreshAllAccountBalances() {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc('refresh_my_balances');
   if (error) {
     throw error;
   }
-
-  return (data ?? []).map(mapTransaction);
 }
 
-async function recalculateDebtBalances(userId: string, debtIds: string[]) {
-  const distinctIds = [...new Set(debtIds.filter(Boolean))];
-  if (distinctIds.length === 0) {
-    return;
-  }
+type NewTransaction = Omit<Transaction, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>;
 
-  const supabase = getSupabaseClient();
-  const [debts, transactions] = await Promise.all([
-    fetchDebts(userId),
-    fetchTransactions(userId),
-  ]);
-  const debtsById = new Map(debts.map((debt) => [debt.id, debt]));
-  const today = new Date().toISOString().split('T')[0];
-
-  for (const debtId of distinctIds) {
-    const debt = debtsById.get(debtId);
-    if (!debt) {
-      continue;
-    }
-
-    const principalPaid = transactions
-      .filter(
-        (transaction) =>
-          transaction.is_debt_payment &&
-          transaction.debt_id === debtId &&
-          transaction.type === 'expense' &&
-          transaction.date <= today &&
-          transaction.is_paid
-      )
-      .reduce(
-        (sum, transaction) => sum + (transaction.principal_portion ?? transaction.amount),
-        0
-      );
-
-    const nextBalance = Math.max(0, debt.total_amount - principalPaid);
-    if (nextBalance === debt.current_balance) {
-      continue;
-    }
-
-    const { error } = await supabase
-      .from('debts')
-      .update({
-        current_balance: nextBalance,
-      })
-      .eq('id', debtId)
-      .eq('user_id', userId);
-
-    if (error) {
-      throw error;
-    }
-  }
-}
-
-async function recalculateAccountBalances(userId: string, accountIds: string[]) {
-  const distinctIds = [...new Set(accountIds.filter(Boolean))];
-  if (distinctIds.length === 0) {
-    return;
-  }
-
-  const supabase = getSupabaseClient();
-  const [accounts, transactions] = await Promise.all([
-    fetchAccounts(userId),
-    fetchTransactions(userId),
-  ]);
-  const accountsById = new Map(accounts.map((account) => [account.id, account]));
-  const today = new Date().toISOString().split('T')[0];
-
-  for (const accountId of distinctIds) {
-    const account = accountsById.get(accountId);
-    if (!account) {
-      continue;
-    }
-
-    let balance = account.initial_balance;
-
-    for (const transaction of transactions) {
-      if (transaction.is_deleted || transaction.date > today) {
-        continue;
-      }
-
-      if (transaction.account_id === accountId) {
-        if (transaction.type === 'income') {
-          balance += transaction.amount;
-        } else {
-          balance -= transaction.amount;
-        }
-      } else if (
-        transaction.type === 'transfer' &&
-        transaction.transfer_account_id === accountId
-      ) {
-        balance += transaction.amount;
-      }
-    }
-
-    const { error } = await supabase
-      .from('accounts')
-      .update({
-        current_balance: balance,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', accountId)
-      .eq('user_id', userId);
-
-    if (error) {
-      throw error;
-    }
-  }
-}
-
-export async function refreshAllAccountBalances(userId: string) {
-  const accounts = await fetchAccounts(userId);
-  await recalculateAccountBalances(userId, accounts.map((account) => account.id));
-}
-
-export async function createTransactionRecord(
-  transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at' | 'is_deleted'>
-): Promise<Transaction> {
+export async function createTransactionRecord(transaction: NewTransaction): Promise<Transaction> {
   const supabase = getSupabaseClient();
   const now = new Date().toISOString();
   const payload: Transaction = {
@@ -581,13 +496,39 @@ export async function createTransactionRecord(
     throw error;
   }
 
-  await recalculateAccountBalances(payload.user_id, [
-    payload.account_id,
-    payload.transfer_account_id ?? '',
-  ]);
-  await recalculateDebtBalances(payload.user_id, [payload.debt_id ?? '']);
-
   return mapTransaction(data);
+}
+
+// One request and one database statement: every row is saved or none is, and balances
+// are recalculated once for the whole batch.
+export async function createTransactionRecords(transactions: NewTransaction[]): Promise<Transaction[]> {
+  if (transactions.length === 0) {
+    return [];
+  }
+
+  const supabase = getSupabaseClient();
+  const now = new Date().toISOString();
+  const payloads = transactions.map((transaction) =>
+    toRemoteTransaction({
+      ...transaction,
+      id: uuidv4(),
+      created_at: now,
+      updated_at: now,
+      is_deleted: false,
+    })
+  );
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert(payloads)
+    .select('*')
+    .returns<RemoteTransaction[]>();
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map(mapTransaction);
 }
 
 export async function updateTransactionRecord(id: string, updates: Partial<Transaction>): Promise<Transaction> {
@@ -620,29 +561,11 @@ export async function updateTransactionRecord(id: string, updates: Partial<Trans
     throw error;
   }
 
-  await recalculateAccountBalances(next.user_id, [
-    current.account_id,
-    current.transfer_account_id ?? '',
-    next.account_id,
-    next.transfer_account_id ?? '',
-  ]);
-  await recalculateDebtBalances(next.user_id, [current.debt_id ?? '', next.debt_id ?? '']);
-
   return mapTransaction(data);
 }
 
 export async function softDeleteTransactionRecord(id: string): Promise<Transaction> {
   const supabase = getSupabaseClient();
-  const { data: existing, error: existingError } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('id', id)
-    .single<RemoteTransaction>();
-
-  if (existingError) {
-    throw existingError;
-  }
-
   const { data, error } = await supabase
     .from('transactions')
     .update({
@@ -656,12 +579,6 @@ export async function softDeleteTransactionRecord(id: string): Promise<Transacti
   if (error) {
     throw error;
   }
-
-  await recalculateAccountBalances(existing.user_id, [
-    existing.account_id,
-    existing.transfer_account_id ?? '',
-  ]);
-  await recalculateDebtBalances(existing.user_id, [existing.debt_id ?? '']);
 
   return mapTransaction(data);
 }

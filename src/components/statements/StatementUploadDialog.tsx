@@ -39,7 +39,7 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
   const user = useUserStore(state => state.user);
   const accounts = useAccountStore(state => state.accounts);
   const categories = useCategoryStore(state => state.categories);
-  const createTransaction = useTransactionStore(state => state.createTransaction);
+  const createTransactions = useTransactionStore(state => state.createTransactions);
 
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [file, setFile] = useState<File | null>(null);
@@ -101,8 +101,8 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
     setImporting(true);
 
     try {
-      let imported = 0;
       let skipped = 0;
+      const rows: Parameters<typeof createTransactions>[0] = [];
 
       for (const index of selectedTransactions) {
         const txn = parseResult.transactions[index];
@@ -121,31 +121,27 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
           continue;
         }
 
-        try {
-          await createTransaction({
-            user_id: user.id,
-            account_id: selectedAccountId,
-            type: txn.type,
-            amount: Math.abs(txn.amount),
-            category_id: finalCategoryId,
-            title: txn.merchant || txn.description,
-            notes: txn.location ? `Location: ${txn.location}\n\nImported from statement` : 'Imported from statement',
-            date: txn.date,
-            is_paid: true,
-            is_recurring: false,
-            is_subscription: false,
-            is_debt_payment: false,
-            exclude_from_budget: false,
-          });
-
-          imported++;
-        } catch (error) {
-          console.error(`Failed to import transaction: ${txn.description}`, error);
-          skipped++;
-        }
+        rows.push({
+          user_id: user.id,
+          account_id: selectedAccountId,
+          type: txn.type,
+          amount: Math.abs(txn.amount),
+          category_id: finalCategoryId,
+          title: txn.merchant || txn.description,
+          notes: txn.location ? `Location: ${txn.location}\n\nImported from statement` : 'Imported from statement',
+          date: txn.date,
+          is_paid: true,
+          is_recurring: false,
+          is_subscription: false,
+          is_debt_payment: false,
+          exclude_from_budget: false,
+        });
       }
 
-      alert(`Import complete!\n\nImported: ${imported}\nSkipped: ${skipped}`);
+      // Saved together: if anything fails, nothing is imported, so the import can simply be retried.
+      const imported = await createTransactions(rows);
+
+      alert(`Import complete!\n\nImported: ${imported.length}\nSkipped: ${skipped}`);
 
       // Reset state
       setFile(null);
@@ -155,7 +151,7 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
 
     } catch (error) {
       console.error('Import error:', error);
-      alert('Failed to import transactions');
+      alert('Failed to import transactions. Nothing was saved, so you can try again.');
     } finally {
       setImporting(false);
     }

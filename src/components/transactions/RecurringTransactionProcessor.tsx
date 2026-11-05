@@ -6,6 +6,8 @@ import { Card } from '@/components/ui/card';
 import { RefreshCw, CheckCircle2, XCircle, Info } from 'lucide-react';
 import { processRecurringTransactions } from '@/lib/recurring-transactions';
 import { useUserStore } from '@/stores/userStore';
+import { useTransactionStore } from '@/stores/transactionStore';
+import { useAccountStore } from '@/stores/accountStore';
 
 interface ProcessingResult {
   processed: number;
@@ -58,7 +60,13 @@ export function RecurringTransactionProcessor({ autoProcess = true }: RecurringT
         setShowCard(true);
       }
 
-      // Trigger a page refresh to show new transactions
+      // New rows were written outside the store, so reload it and the balances.
+      if (processingResult.generated > 0) {
+        await Promise.all([
+          useTransactionStore.getState().loadTransactions(user.id, { force: true }),
+          useAccountStore.getState().loadAccounts(user.id),
+        ]);
+      }
       window.dispatchEvent(new CustomEvent('recurring-transactions-processed'));
     } catch (err) {
       console.error('Failed to process recurring transactions:', err);
