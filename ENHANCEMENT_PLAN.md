@@ -66,7 +66,7 @@ Saving a transaction used to download every transaction twice to add up balances
 - **Account edits:** writing an account's balance directly, as the account dialog does, is corrected automatically.
 - **Future-dated transactions:** `refresh_my_balances()` runs when accounts load, so these start counting once their date arrives.
 
-Every function runs with the user's own rights, so row-level security still applies, and anonymous visitors can't call them. The browser code that did this before has been removed.
+The functions users can call run with their own rights, and anonymous visitors can't call them. The trigger itself runs with the owner's rights (migration 012), because Supabase Auth deletes a user's transactions as its own database role. It only counts transactions belonging to the account's or debt's owner, so one user can't change another's balances. The browser code that did this before has been removed.
 
 ### 0.2 No more rows silently lost past 1,000 (done)
 
@@ -95,7 +95,7 @@ The statement dialog saves every row in a single insert, which PostgREST runs as
 
 Most of the value of Actual's import comes from its rules.
 
-**Data (migration 012)**
+**Data (migration 013)**
 - `rules`: `id`, `user_id`, `stage` (`pre`, `default` or `post`), `conditions jsonb`, `actions jsonb`, `sort_order`, `is_auto` (learned rather than written by the user), `created_at`, with row-level security.
 - `transactions.imported_payee text`: the bank's original description, kept unchanged so rename rules can always match it.
 
@@ -122,7 +122,7 @@ Most of the value of Actual's import comes from its rules.
 - `qif.ts`: QIF.
 - The existing FNB PDF parser stays, as one more source with the same output format.
 
-**Duplicate detection (migration 013):**
+**Duplicate detection (migration 014):**
 - **Exact:** add `transactions.imported_id text`, with a unique index on `(account_id, imported_id)` where it's set. OFX supplies the ID; for CSV and PDF, use a hash of date, amount and description.
 - **Fuzzy:** flag rows on the same account with the same amount within 3 days, marked "possible duplicate", for the user to keep or skip.
 
@@ -134,7 +134,7 @@ Most of the value of Actual's import comes from its rules.
 
 ### 2.1 Schedules table (L)
 
-**Migration 014:** `schedules`, with these fields:
+**Migration 015:** `schedules`, with these fields:
 - **Basics:** `id`, `user_id`, `name`, `account_id`, `payee`, `category_id`, `type`.
 - **Amount:** `amount_type` (`exact`, `approx` or `range`), plus `amount` or `amount_min` and `amount_max`.
 - **Timing:** recurrence (frequency, interval, day of month or "last day"), `next_date`, `end_date`, and `weekend` (`none`, `before` or `after`).
@@ -165,7 +165,7 @@ Existing budgets keep working. A new **Budget month** view adds Actual's envelop
 - **Payday cycles:** a budget month runs from `user_profiles.payday_date` to the day before the next payday, for example the 25th to the 24th. Many South Africans are paid on the 25th, and Actual only supports calendar months.
 - **Money to budget:** income received in the cycle, plus last cycle's leftover, minus what's been assigned.
 - **Per category:** assigned, spent and available. Available carries into the next cycle when `rollover_unused` is on, which finally uses that column. Overspending is shown in red and taken from the next cycle's money to budget.
-- **Data (migration 015):** `budget_allocations(user_id, category_id, cycle_start date, amount)`, with row-level security and a unique index on `(user_id, category_id, cycle_start)`. Calculated by a `budget_month(cycle_start)` function, not in the browser.
+- **Data (migration 016):** `budget_allocations(user_id, category_id, cycle_start date, amount)`, with row-level security and a unique index on `(user_id, category_id, cycle_start)`. Calculated by a `budget_month(cycle_start)` function, not in the browser.
 
 ### 3.2 Budget automations (M)
 
@@ -234,10 +234,10 @@ Add a `dashboard_layout jsonb` column to `user_profiles`. Users can add, remove,
 
 | Phase | Depends on | Size | Main migrations |
 |---|---|---|---|
-| 0: Efficiency (done) | Nothing | M | 010 (balance functions and triggers), 011 (drop `sync_queue`) |
-| 1: Rules and import | 0 | L | 012 (rules, `imported_payee`), 013 (`imported_id`) |
-| 2: Schedules | 0, and best after 1 | L | 014 (schedules, holidays, `pg_cron` job) |
-| 3: Budget month | 2, for the schedule template | L | 015 (allocations, budget templates) |
+| 0: Efficiency (done) | Nothing | M | 010 (balance functions and triggers), 011 (drop `sync_queue`), 012 (trigger rights) |
+| 1: Rules and import | 0 | L | 013 (rules, `imported_payee`), 014 (`imported_id`) |
+| 2: Schedules | 0, and best after 1 | L | 015 (schedules, holidays, `pg_cron` job) |
+| 3: Budget month | 2, for the schedule template | L | 016 (allocations, budget templates) |
 | 4: Ledger features | 0 | M | Splits, cleared and reconciled, tag index, `pg_trgm` |
 | 5: Reports and dashboard | 3 and 4, for the full set | M | Report functions, dashboard layout |
 
