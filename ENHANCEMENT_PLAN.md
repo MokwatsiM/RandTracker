@@ -148,7 +148,7 @@ Most of the value of Actual's import comes from its rules.
 ## Phase 2: Schedules for debit orders and subscriptions (done, November 2026)
 
 **What shipped:**
-- **Migration 015:** adds the `schedules` table, with row-level security that only allows the user's own accounts. Transactions get `schedule_id` and `schedule_date`, with one transaction per occurrence. It also adds the date functions (South African public holidays from the Easter calculation, moving dates to a working day, month arithmetic that keeps the 31st), `record_schedule_occurrence`, `skip_schedule_occurrence` and `post_due_schedules`, plus a `pg_cron` job at 00:15 South African time.
+- **Migrations 015 and 016:** 016 lets deleting a user work with schedules, the same fix as 012. 015 adds the `schedules` table, with row-level security that only allows the user's own accounts. Transactions get `schedule_id` and `schedule_date`, with one transaction per occurrence. It also adds the date functions (South African public holidays from the Easter calculation, moving dates to a working day, month arithmetic that keeps the 31st), `record_schedule_occurrence`, `skip_schedule_occurrence` and `post_due_schedules`, plus a `pg_cron` job at 00:15 South African time.
 - **Moving recurring transactions over:** existing recurring series became automatic schedules linked to their past transactions. `RecurringTransactionProcessor` and `recurring-transactions.ts` are gone. "Repeat this" in the transaction dialog now creates a schedule.
 - **Schedules page:** shows the next 30 days, the schedules that ask first (with record and skip), a subscriptions total, and Find schedules. Find schedules covers repeating payees and the minimum payments on debts.
 - **Dashboard:** a "Coming up" card.
@@ -193,7 +193,7 @@ Existing budgets keep working. A new **Budget month** view adds Actual's envelop
 - **Payday cycles:** a budget month runs from `user_profiles.payday_date` to the day before the next payday, for example the 25th to the 24th. Many South Africans are paid on the 25th, and Actual only supports calendar months.
 - **Money to budget:** income received in the cycle, plus last cycle's leftover, minus what's been assigned.
 - **Per category:** assigned, spent and available. Available carries into the next cycle when `rollover_unused` is on, which finally uses that column. Overspending is shown in red and taken from the next cycle's money to budget.
-- **Data (migration 016):** `budget_allocations(user_id, category_id, cycle_start date, amount)`, with row-level security and a unique index on `(user_id, category_id, cycle_start)`. Calculated by a `budget_month(cycle_start)` function, not in the browser.
+- **Data (migration 017):** `budget_allocations(user_id, category_id, cycle_start date, amount)`, with row-level security and a unique index on `(user_id, category_id, cycle_start)`. Calculated by a `budget_month(cycle_start)` function, not in the browser.
 
 ### 3.2 Budget automations (M)
 
@@ -263,9 +263,9 @@ Add a `dashboard_layout jsonb` column to `user_profiles`. Users can add, remove,
 | Phase | Depends on | Size | Main migrations |
 |---|---|---|---|
 | 0: Efficiency (done) | Nothing | M | 010 (balance functions and triggers), 011 (drop `sync_queue`), 012 (trigger rights) |
-| 1: Rules and import | 0 | L | 013 (rules, `imported_payee`), 014 (`imported_id`) |
-| 2: Schedules | 0, and best after 1 | L | 015 (schedules, holidays, `pg_cron` job) |
-| 3: Budget month | 2, for the schedule template | L | 016 (allocations, budget templates) |
+| 1: Rules and import (done) | 0 | L | 013 (rules, `imported_payee`), 014 (`imported_id`) |
+| 2: Schedules (done) | 0, and best after 1 | L | 015 (schedules, holidays, `pg_cron` job), 016 (trigger rights) |
+| 3: Budget month | 2, for the schedule template | L | 017 (allocations, budget templates) |
 | 4: Ledger features | 0 | M | Splits, cleared and reconciled, tag index, `pg_trgm` |
 | 5: Reports and dashboard | 3 and 4, for the full set | M | Report functions, dashboard layout |
 
@@ -273,7 +273,7 @@ Phase 4 can run alongside Phases 2 and 3, because it touches different files.
 
 ## Ground rules for every phase
 
-- **Security:** every new table gets row-level security limited to `auth.uid() = user_id`. Every new view or report function uses `security_invoker` or filters by `auth.uid()`. Extend the two-user isolation test from the deployment to cover each new table, view and function.
+- **Security:** every new table gets row-level security limited to `auth.uid() = user_id`. Any trigger on `transactions` or a table that cascades from `auth.users` must run with the owner's rights (`SECURITY DEFINER`, filtered by owner), or deleting a user fails, as migrations 012 and 016 found. Every new view or report function uses `security_invoker` or filters by `auth.uid()`. Extend the two-user isolation test from the deployment to cover each new table, view and function.
 - **Deployment:** migrations go in `supabase/migrations/` and run automatically when pushed to `dev`. Each migration must work on an empty database as well as on live data.
 - **Server limits:** the VPS has 1 vCPU and 3.8 GB of RAM, shared with the LGE recorder. Do heavy work in SQL rather than in extra containers. `pg_cron` and `pg_trgm` already ship with the database image.
 - **Tests:** the project has no test runner yet. Add Vitest with the rules engine, so the rules, the parsers (CSV, OFX, QIF and FNB PDF), duplicate detection, schedule date maths and budget cycle maths are unit-tested from the start.
