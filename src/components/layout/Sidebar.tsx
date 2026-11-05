@@ -12,13 +12,15 @@ import {
   Target,
   BarChart3,
   Settings,
-  Wand2
+  Wand2,
+  CalendarClock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
+  { name: 'Schedules', href: '/dashboard/schedules', icon: CalendarClock },
   { name: 'Rules', href: '/dashboard/rules', icon: Wand2 },
   { name: 'Accounts', href: '/dashboard/accounts', icon: CreditCard },
   { name: 'Budgets', href: '/dashboard/budgets', icon: PiggyBank },

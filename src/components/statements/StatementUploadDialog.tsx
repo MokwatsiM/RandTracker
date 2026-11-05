@@ -10,6 +10,8 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useRuleStore } from '@/stores/ruleStore';
+import { useScheduleStore } from '@/stores/scheduleStore';
+import { matchSchedule } from '@/lib/schedules/match';
 import { useUserStore } from '@/stores/userStore';
 import { matchCategory } from '@/lib/statement-parser';
 import { formatZAR } from '@/lib/currency';
@@ -27,7 +29,7 @@ import {
   type FileKind,
   type StatementFile,
 } from '@/lib/import';
-import { fetchExistingImportIds } from '@/lib/supabase/data';
+import { fetchExistingImportIds, fetchScheduleOccurrences } from '@/lib/supabase/data';
 import type { Account } from '@/lib/db/schema';
 
 interface StatementUploadDialogProps {
@@ -57,6 +59,8 @@ interface PreviewRow {
   tags?: string[];
   excludeFromBudget: boolean;
   debtId: string | null;
+  /** The schedule occurrence this row is, so the schedule moves on instead of adding it again. */
+  schedule?: { id: string; date: string; name: string };
 }
 
 const LIABILITY_TYPES: Account['type'][] = ['credit_card', 'loan', 'store_card'];
@@ -72,6 +76,7 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
   const createTransactions = useTransactionStore((state) => state.createTransactions);
   const loadRules = useRuleStore((state) => state.loadRules);
   const learnCategories = useRuleStore((state) => state.learnCategories);
+  const loadSchedules = useScheduleStore((state) => state.loadSchedules);
 
   const [accountId, setAccountId] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -88,8 +93,9 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
     if (open && user) {
       void loadTransactions(user.id);
       void loadRules(user.id);
+      void loadSchedules(user.id);
     }
-  }, [open, user, loadTransactions, loadRules]);
+  }, [open, user, loadTransactions, loadRules, loadSchedules]);
 
   const reset = () => {
     setFile(null);
@@ -120,6 +126,10 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
     const importedIndexes = new Set(importIds.flatMap((id, i) => (alreadyImported.has(id) ? [i] : [])));
     const possible = findPossibleDuplicates(file.rows, transactions, account.id, 3, importedIndexes);
     const titles = new Map(transactions.map((t) => [t.id, `${t.title} on ${t.date}`]));
+    const schedules = await loadSchedules(user.id, { force: true });
+    const accountSchedules = schedules.filter((s) => s.account_id === account.id);
+    const occurrences = await fetchScheduleOccurrences(accountSchedules.map((s) => s.id));
+    const claimed = new Set<string>();
 
     const preview = file.rows.map((row, key): PreviewRow => {
       const type = row.amount >= 0 ? 'income' : 'expense';
@@ -143,12 +153,37 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
         categorySource = result.category_id ? 'rule' : hinted ? 'statement' : 'fallback';
       }
 
-      const status: RowStatus = importedIndexes.has(key) ? 'imported' : possible.has(key) ? 'possible' : 'new';
+      let status: RowStatus = importedIndexes.has(key) ? 'imported' : possible.has(key) ? 'possible' : 'new';
+      let duplicateOf = possible.has(key) ? titles.get(possible.get(key)!) : undefined;
+
+      // A row that is a schedule's occurrence: if the schedule already added it, it's a
+      // likely duplicate; otherwise it's linked so the schedule moves on.
+      let schedule: PreviewRow['schedule'];
+      const match = status === 'new' ? matchSchedule(row, account.id, accountSchedules) : null;
+      if (match) {
+        const occurrenceKey = `${match.scheduleId}|${match.scheduleDate}`;
+        const existing = occurrences.get(occurrenceKey);
+        const name = accountSchedules.find((s) => s.id === match.scheduleId)?.name ?? 'a schedule';
+        if (existing && !existing.is_deleted) {
+          status = 'possible';
+          duplicateOf = `${existing.title} on ${existing.date}`;
+        } else if (!existing && !claimed.has(occurrenceKey)) {
+          claimed.add(occurrenceKey);
+          schedule = { id: match.scheduleId, date: match.scheduleDate, name };
+          const scheduled = accountSchedules.find((s) => s.id === match.scheduleId);
+          if (categorySource === 'fallback' && scheduled?.category_id) {
+            categoryId = scheduled.category_id;
+            categorySource = 'rule';
+          }
+        }
+      }
+
       return {
         key,
         include: status === 'new',
         status,
-        duplicateOf: possible.has(key) ? titles.get(possible.get(key)!) : undefined,
+        duplicateOf,
+        schedule,
         importedId: importIds[key],
         date: row.date,
         amount: row.amount,
@@ -255,6 +290,8 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
           tags: r.tags,
           imported_payee: r.importedPayee,
           imported_id: r.importedId,
+          schedule_id: r.schedule?.id,
+          schedule_date: r.schedule?.date,
           is_paid: true,
           is_recurring: false,
           is_subscription: false,
@@ -264,6 +301,11 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
         })),
         { skipImported: true }
       );
+
+      // Linked rows moved their schedules on in the database.
+      if (included.some((r) => r.schedule)) {
+        await loadSchedules(user.id, { force: true });
+      }
 
       if (csv && JSON.stringify(account.import_settings?.csv) !== JSON.stringify(csv.mapping)) {
         await updateAccount(account.id, { import_settings: { ...account.import_settings, csv: csv.mapping } });
@@ -594,6 +636,11 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
                         {r.status === 'possible' && (
                           <Badge variant="outline" className="border-amber-400 text-amber-700 dark:text-amber-400">
                             Possible duplicate{r.duplicateOf ? ` of ${r.duplicateOf}` : ''}
+                          </Badge>
+                        )}
+                        {r.schedule && (
+                          <Badge variant="outline" className="border-blue-400 text-blue-700 dark:text-blue-400">
+                            Schedule: {r.schedule.name}
                           </Badge>
                         )}
                         {r.categorySource === 'rule' && (

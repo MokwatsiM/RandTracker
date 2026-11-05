@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { FAB } from '@/components/layout/FAB';
 import { QuickAddSheet } from '@/components/transactions/QuickAddSheet';
+import { SchedulePoster } from '@/components/schedules/SchedulePoster';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardLayout({
@@ -30,6 +31,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
+      <SchedulePoster />
 
       {/* Main content */}
       <div className="md:pl-64">

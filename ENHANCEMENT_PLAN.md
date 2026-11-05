@@ -145,7 +145,20 @@ Most of the value of Actual's import comes from its rules.
 
 **Reconcile from the statement:** the PDF and OFX parsers already read the closing balance. After an import, compare it with the account balance and offer to reconcile (see 4.2).
 
-## Phase 2: Schedules for debit orders and subscriptions
+## Phase 2: Schedules for debit orders and subscriptions (done, November 2026)
+
+**What shipped:**
+- **Migration 015:** adds the `schedules` table, with row-level security that only allows the user's own accounts. Transactions get `schedule_id` and `schedule_date`, with one transaction per occurrence. It also adds the date functions (South African public holidays from the Easter calculation, moving dates to a working day, month arithmetic that keeps the 31st), `record_schedule_occurrence`, `skip_schedule_occurrence` and `post_due_schedules`, plus a `pg_cron` job at 00:15 South African time.
+- **Moving recurring transactions over:** existing recurring series became automatic schedules linked to their past transactions. `RecurringTransactionProcessor` and `recurring-transactions.ts` are gone. "Repeat this" in the transaction dialog now creates a schedule.
+- **Schedules page:** shows the next 30 days, the schedules that ask first (with record and skip), a subscriptions total, and Find schedules. Find schedules covers repeating payees and the minimum payments on debts.
+- **Dashboard:** a "Coming up" card.
+- **Imports:** a row that matches a schedule is linked to it. One the schedule already added is flagged as a possible duplicate.
+- **Tests:** the date, holiday, matching and detection rules are unit-tested, and the SQL date functions were checked against the same cases.
+
+**Differences from the plan below:**
+- **Holidays:** they're calculated rather than stored in a table, so no yearly update is needed. One-off holidays such as election days aren't included.
+- **Account ledger:** upcoming items show on the dashboard and the Schedules page, not yet in the account ledger.
+
 
 ### 2.1 Schedules table (L)
 

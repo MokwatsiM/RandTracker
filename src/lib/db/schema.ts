@@ -74,6 +74,9 @@ export interface Transaction {
   imported_payee?: string;
   /** Stops the same statement row being imported twice into an account. */
   imported_id?: string;
+  /** The schedule occurrence this transaction is, if any. */
+  schedule_id?: string;
+  schedule_date?: string;
   is_paid: boolean;
   exclude_from_budget: boolean;
 

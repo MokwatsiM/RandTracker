@@ -8,6 +8,8 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useUserStore } from '@/stores/userStore';
+import { useScheduleStore } from '@/stores/scheduleStore';
+import { UpcomingSchedules } from '@/components/schedules/UpcomingSchedules';
 import { formatZAR, formatTransactionAmount } from '@/lib/currency';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -17,14 +19,17 @@ export default function DashboardPage() {
   const { accounts, loadAccounts, getTotalBalance } = useAccountStore();
   const { transactions, loadTransactions, getMonthlyIncome, getMonthlyExpenses } = useTransactionStore();
   const { categories, loadCategories } = useCategoryStore();
+  const loadSchedules = useScheduleStore(state => state.loadSchedules);
+  const hasSchedules = useScheduleStore(state => state.schedules.length > 0);
 
   useEffect(() => {
     if (user) {
       loadAccounts(user.id);
       loadTransactions(user.id);
       loadCategories(user.id);
+      loadSchedules(user.id);
     }
-  }, [user, loadAccounts, loadTransactions, loadCategories]);
+  }, [user, loadAccounts, loadTransactions, loadCategories, loadSchedules]);
 
   if (!user) {
     return null;
@@ -115,6 +120,21 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {hasSchedules && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Coming up</CardTitle>
+              <CardDescription>Debit orders and payments in the next 7 days</CardDescription>
+            </div>
+            <Link href="/dashboard/schedules" className="text-sm underline">All schedules</Link>
+          </CardHeader>
+          <CardContent>
+            <UpcomingSchedules days={7} limit={6} />
+          </CardContent>
+        </Card>
+      )}
 
       {transactions.length === 0 ? (
         <Card>

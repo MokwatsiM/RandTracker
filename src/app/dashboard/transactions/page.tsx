@@ -12,7 +12,6 @@ import { useCategoryStore } from '@/stores/categoryStore';
 import { useUserStore } from '@/stores/userStore';
 import { TransactionRow } from '@/components/transactions/TransactionRow';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
-import { RecurringTransactionProcessor } from '@/components/transactions/RecurringTransactionProcessor';
 import { StatementUploadDialog } from '@/components/statements/StatementUploadDialog';
 import { formatZAR } from '@/lib/currency';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
@@ -57,20 +56,6 @@ export default function TransactionsPage() {
       initializeDefaultCategories(user.id);
     }
   }, [user, loadTransactions, loadAccounts, loadCategories, initializeDefaultCategories]);
-
-  // Listen for recurring transactions processed event
-  useEffect(() => {
-    const handleRecurringProcessed = () => {
-      if (user) {
-        loadTransactions(user.id, { force: true });
-      }
-    };
-
-    window.addEventListener('recurring-transactions-processed', handleRecurringProcessed);
-    return () => {
-      window.removeEventListener('recurring-transactions-processed', handleRecurringProcessed);
-    };
-  }, [user, loadTransactions]);
 
   // Filter and sort transactions
   const filteredAndSortedTransactions = useMemo(() => {
@@ -211,9 +196,6 @@ export default function TransactionsPage() {
           </Button>
         </div>
       </div>
-
-      {/* Recurring Transaction Processor */}
-      <RecurringTransactionProcessor />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">

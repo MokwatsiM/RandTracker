@@ -19,6 +19,9 @@ import { useAccountStore } from '@/stores/accountStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useDebtStore } from '@/stores/debtStore';
 import { useRuleStore } from '@/stores/ruleStore';
+import { useScheduleStore } from '@/stores/scheduleStore';
+import { firstOccurrenceFrom, nextOccurrence } from '@/lib/schedules/dates';
+import type { ScheduleDraft, ScheduleFrequency } from '@/lib/schedules/types';
 import { applyRules } from '@/lib/rules/engine';
 import type { RuleSubject } from '@/lib/rules/types';
 import { useUserStore } from '@/stores/userStore';
@@ -56,6 +59,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
   const { debts, loadDebts } = useDebtStore();
 
   const { rules, loadRules, learnCategories, planRename, saveChange } = useRuleStore();
+  const createSchedule = useScheduleStore((state) => state.createSchedule);
 
   const [formData, setFormData] = useState(getInitialFormData(transaction));
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,6 +151,45 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
     }
   };
 
+  // "Repeat this" creates a schedule, and this transaction becomes its first occurrence,
+  // so the server adds the following ones on their dates.
+  const createRepeating = async (transactionData: any) => {
+    if (!user) return;
+    const repeat: Record<string, [ScheduleFrequency, number]> = {
+      weekly: ['weekly', 1], biweekly: ['weekly', 2], monthly: ['monthly', 1], quarterly: ['monthly', 3], yearly: ['yearly', 1],
+    };
+    const [frequency, interval] = repeat[formData.recurrence_frequency] ?? ['monthly', 1];
+    const timing = { frequency, interval, start_date: transactionData.date as string, month_end: false };
+    const today = new Date().toISOString().slice(0, 10);
+    const draft: ScheduleDraft = {
+      name: transactionData.title,
+      payee: transactionData.title,
+      account_id: transactionData.account_id,
+      type: transactionData.type,
+      transfer_account_id: transactionData.transfer_account_id ?? null,
+      category_id: transactionData.category_id || null,
+      subcategory_id: transactionData.subcategory_id || null,
+      amount: transactionData.amount,
+      amount_type: 'exact',
+      amount_min: null,
+      amount_max: null,
+      ...timing,
+      // Dated in the future: the schedule adds it on the day instead of now.
+      next_date: timing.start_date > today ? timing.start_date : nextOccurrence(timing, timing.start_date) ?? firstOccurrenceFrom(timing, today),
+      end_date: formData.recurrence_end_date || null,
+      weekend: 'none',
+      auto_add: true,
+      is_subscription: false,
+      debt_id: transactionData.debt_id ?? null,
+      notes: transactionData.notes ?? null,
+      is_active: true,
+    };
+    const schedule = await createSchedule(user.id, draft);
+    if (timing.start_date <= today) {
+      await createTransaction({ ...transactionData, is_recurring: false, schedule_id: schedule.id, schedule_date: timing.start_date });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -198,6 +241,8 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
       if (transaction) {
         await updateTransaction(transaction.id, transactionData);
         await learnFromEdit(transaction, transactionData);
+      } else if (formData.is_recurring) {
+        await createRepeating(transactionData);
       } else {
         await createTransaction(transactionData);
       }
@@ -441,6 +486,8 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
           </div>
 
           {/* Recurring Transaction */}
+          {/* Only for new transactions; existing schedules are managed on the Schedules page. */}
+          {!transaction && (
           <div className="border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
               <input
@@ -451,7 +498,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
                 className="w-4 h-4"
               />
               <Label htmlFor="is_recurring" className="mb-0 cursor-pointer">
-                This is a recurring transaction
+                Repeat this (creates a schedule)
               </Label>
             </div>
 
@@ -482,12 +529,13 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
                     min={formData.date}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Leave empty for ongoing recurring transaction
+                    Leave empty to keep repeating. Manage it later under Schedules.
                   </p>
                 </div>
               </div>
             )}
           </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

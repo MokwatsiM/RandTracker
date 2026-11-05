@@ -12,6 +12,7 @@ import type {
 } from '@/lib/db/schema';
 import { createClient } from '@/lib/supabase/client';
 import type { Rule, RuleDraft } from '@/lib/rules/types';
+import type { Schedule, ScheduleDraft } from '@/lib/schedules/types';
 
 type RemoteUserProfile = {
   id: string;
@@ -69,6 +70,8 @@ type RemoteTransaction = {
   tags: string[] | null;
   imported_payee: string | null;
   imported_id: string | null;
+  schedule_id: string | null;
+  schedule_date: string | null;
   is_paid: boolean;
   exclude_from_budget: boolean;
   is_deleted: boolean;
@@ -200,6 +203,8 @@ function mapTransaction(transaction: RemoteTransaction): Transaction {
     tags: transaction.tags ?? undefined,
     imported_payee: transaction.imported_payee ?? undefined,
     imported_id: transaction.imported_id ?? undefined,
+    schedule_id: transaction.schedule_id ?? undefined,
+    schedule_date: transaction.schedule_date ?? undefined,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     created_at: transaction.created_at,
@@ -275,6 +280,8 @@ function toRemoteTransaction(transaction: Transaction) {
     tags: transaction.tags ?? null,
     imported_payee: transaction.imported_payee ?? null,
     imported_id: transaction.imported_id ?? null,
+    schedule_id: transaction.schedule_id ?? null,
+    schedule_date: transaction.schedule_date ?? null,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     is_deleted: transaction.is_deleted,
@@ -636,6 +643,105 @@ export async function deleteRuleRecord(id: string): Promise<void> {
   if (error) {
     throw error;
   }
+}
+
+/**
+ * Occurrences of these schedules that already have a transaction, including deleted ones,
+ * keyed by "scheduleId|scheduleDate".
+ */
+export async function fetchScheduleOccurrences(
+  scheduleIds: string[]
+): Promise<Map<string, { id: string; title: string; date: string; is_deleted: boolean }>> {
+  const found = new Map<string, { id: string; title: string; date: string; is_deleted: boolean }>();
+  if (scheduleIds.length === 0) {
+    return found;
+  }
+  const supabase = getSupabaseClient();
+  const rows = await fetchAllPages<{ id: string; title: string; date: string; is_deleted: boolean; schedule_id: string; schedule_date: string }>(
+    (from, to) =>
+      supabase
+        .from('transactions')
+        .select('id, title, date, is_deleted, schedule_id, schedule_date')
+        .in('schedule_id', scheduleIds)
+        .order('id')
+        .range(from, to)
+  );
+  for (const row of rows) {
+    found.set(`${row.schedule_id}|${row.schedule_date}`, row);
+  }
+  return found;
+}
+
+export async function fetchSchedules(userId: string): Promise<Schedule[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('schedules')
+    .select('*')
+    .eq('user_id', userId)
+    .order('name')
+    .returns<Schedule[]>();
+  if (error) {
+    throw error;
+  }
+  return data ?? [];
+}
+
+export async function createScheduleRecord(userId: string, draft: ScheduleDraft): Promise<Schedule> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from('schedules').insert({ ...draft, user_id: userId }).select('*').single<Schedule>();
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+export async function updateScheduleRecord(id: string, updates: Partial<ScheduleDraft>): Promise<Schedule> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from('schedules').update(updates).eq('id', id).select('*').single<Schedule>();
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+export async function deleteScheduleRecord(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('schedules').delete().eq('id', id);
+  if (error) {
+    throw error;
+  }
+}
+
+/** Records the schedule's next occurrence as a transaction; returns the transaction id. */
+export async function recordScheduleOccurrence(id: string, amount?: number, date?: string): Promise<string> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('record_schedule_occurrence', {
+    p_schedule_id: id,
+    p_amount: amount ?? null,
+    p_date: date ?? null,
+  });
+  if (error) {
+    throw error;
+  }
+  return data as string;
+}
+
+export async function skipScheduleOccurrence(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.rpc('skip_schedule_occurrence', { p_schedule_id: id });
+  if (error) {
+    throw error;
+  }
+}
+
+/** Posts the signed-in user's due automatic schedules; returns how many were added. */
+export async function postDueSchedules(): Promise<number> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('post_due_schedules');
+  if (error) {
+    throw error;
+  }
+  return (data as number) ?? 0;
 }
 
 export async function updateTransactionRecord(id: string, updates: Partial<Transaction>): Promise<Transaction> {
