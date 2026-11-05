@@ -2,9 +2,16 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
-  const next = searchParams.get('next') ?? '/dashboard';
+  const requestedNext = searchParams.get('next') ?? '/dashboard';
+  // Only paths on this site: "//other.site" would redirect away from it.
+  const next = /^\/(?![/\\])/.test(requestedNext) ? requestedNext : '/dashboard';
+
+  // Behind the tunnel, request.url has the container's address rather than the public one.
+  const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host');
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https';
+  const origin = `${proto}://${host}`;
 
   if (code) {
     const supabase = await createClient();
