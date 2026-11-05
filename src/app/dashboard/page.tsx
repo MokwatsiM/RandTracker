@@ -1,210 +1,103 @@
 'use client';
 
-import { useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ArrowUpRight, ArrowDownRight, Wallet, TrendingDown } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { GettingStarted, WIDGETS, renderWidget } from '@/components/dashboard/widgets';
+import { DEFAULT_LAYOUT, moveItem, resizeItem, toggleItem, visibleLayout, type LayoutItem } from '@/lib/reports/layout';
 import { useAccountStore } from '@/stores/accountStore';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useUserStore } from '@/stores/userStore';
-import { useScheduleStore } from '@/stores/scheduleStore';
-import { UpcomingSchedules } from '@/components/schedules/UpcomingSchedules';
-import { formatZAR, formatTransactionAmount } from '@/lib/currency';
-import { format } from 'date-fns';
-import Link from 'next/link';
 
 export default function DashboardPage() {
-  const user = useUserStore(state => state.user);
-  const { accounts, loadAccounts, getTotalBalance } = useAccountStore();
-  const { transactions, loadTransactions, getMonthlyIncome, getMonthlyExpenses } = useTransactionStore();
-  const { categories, loadCategories } = useCategoryStore();
-  const loadSchedules = useScheduleStore(state => state.loadSchedules);
-  const hasSchedules = useScheduleStore(state => state.schedules.length > 0);
+  const user = useUserStore((state) => state.user);
+  const updateProfile = useUserStore((state) => state.updateProfile);
+  const { accounts, loadAccounts } = useAccountStore();
+  const { transactions, loadTransactions } = useTransactionStore();
+  const loadCategories = useCategoryStore((state) => state.loadCategories);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<LayoutItem[]>([]);
 
   useEffect(() => {
     if (user) {
       loadAccounts(user.id);
       loadTransactions(user.id);
       loadCategories(user.id);
-      loadSchedules(user.id);
     }
-  }, [user, loadAccounts, loadTransactions, loadCategories, loadSchedules]);
+  }, [user, loadAccounts, loadTransactions, loadCategories]);
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
-  const totalBalance = getTotalBalance();
-  const monthlyIncome = getMonthlyIncome(new Date());
-  const monthlyExpenses = getMonthlyExpenses(new Date());
-  const recentTransactions = transactions.slice(0, 5);
+  const layout = editing ? draft : visibleLayout(user.dashboard_layout, WIDGETS);
+  const hidden = WIDGETS.filter((w) => !layout.some((item) => item.id === w.id));
 
-  const getCategoryName = (categoryId: string) => {
-    return categories.find(c => c.id === categoryId)?.name || 'Unknown';
+  const startEditing = () => {
+    setDraft(visibleLayout(user.dashboard_layout, WIDGETS));
+    setEditing(true);
   };
 
-  const getAccountName = (accountId: string) => {
-    return accounts.find(a => a.id === accountId)?.name || 'Unknown';
+  const save = () => {
+    updateProfile({ dashboard_layout: draft });
+    setEditing(false);
   };
-
-  const totalDebt = accounts
-    .filter(acc => acc.type === 'credit_card' || acc.type === 'loan' || acc.type === 'store_card')
-    .reduce((sum, acc) => sum + acc.current_balance, 0);
-
-  const activeDebts = accounts.filter(
-    acc => (acc.type === 'credit_card' || acc.type === 'loan' || acc.type === 'store_card') && acc.current_balance > 0
-  ).length;
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back{user?.display_name ? `, ${user.display_name}` : ''}!
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back{user.display_name ? `, ${user.display_name}` : ''}!</p>
+        </div>
+        {editing ? (
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setDraft(DEFAULT_LAYOUT)}>Reset</Button>
+            <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+            <Button onClick={save}>Save layout</Button>
+          </div>
+        ) : (
+          <Button variant="outline" onClick={startEditing}>
+            <LayoutGrid className="mr-2 h-4 w-4" />
+            Customise
+          </Button>
+        )}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {editing && hidden.length > 0 && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Worth</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Add a card</CardTitle>
+            <CardDescription>Hidden cards. Use the arrows on each card to reorder, and the size button to make it full width.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${totalBalance < 0 ? 'text-red-600' : ''}`}>
-              {formatZAR(totalBalance)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {accounts.length} {accounts.length === 1 ? 'account' : 'accounts'}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Income (Month)</CardTitle>
-            <ArrowUpRight className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
-              {formatZAR(monthlyIncome)}
-            </div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expenses (Month)</CardTitle>
-            <ArrowDownRight className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {formatZAR(monthlyExpenses)}
-            </div>
-            <p className="text-xs text-muted-foreground">This month</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Debt</CardTitle>
-            <TrendingDown className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatZAR(totalDebt)}</div>
-            <p className="text-xs text-muted-foreground">
-              {activeDebts} active {activeDebts === 1 ? 'debt' : 'debts'}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {hasSchedules && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Coming up</CardTitle>
-              <CardDescription>Debit orders and payments in the next 7 days</CardDescription>
-            </div>
-            <Link href="/dashboard/schedules" className="text-sm underline">All schedules</Link>
-          </CardHeader>
-          <CardContent>
-            <UpcomingSchedules days={7} limit={6} />
+          <CardContent className="flex flex-wrap gap-2">
+            {hidden.map((w) => (
+              <Button key={w.id} size="sm" variant="outline" onClick={() => setDraft(toggleItem(draft, w))}>+ {w.title}</Button>
+            ))}
           </CardContent>
         </Card>
       )}
 
-      {transactions.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Getting Started</CardTitle>
-            <CardDescription>Set up your accounts and start tracking</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  {accounts.length > 0 ? '✓' : '1'}
+      {transactions.length === 0 && !editing && <GettingStarted hasAccounts={accounts.length > 0} />}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {layout.map((item, index) => {
+          const widget = WIDGETS.find((w) => w.id === item.id)!;
+          return (
+            <div key={item.id} className={`relative ${item.size === 'full' ? 'lg:col-span-2' : ''} ${editing ? 'rounded-lg outline-dashed outline-2 outline-offset-2 outline-primary/40' : ''}`}>
+              {editing && (
+                <div className="absolute right-2 top-2 z-10 flex gap-1 rounded-md bg-background/90 p-1 shadow">
+                  <Button size="sm" variant="ghost" disabled={index === 0} onClick={() => setDraft(moveItem(draft, item.id, -1))} aria-label={`Move ${widget.title} up`}><ArrowUp className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="ghost" disabled={index === layout.length - 1} onClick={() => setDraft(moveItem(draft, item.id, 1))} aria-label={`Move ${widget.title} down`}><ArrowDown className="h-4 w-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => setDraft(resizeItem(draft, item.id))}>{item.size === 'full' ? 'Half' : 'Full'}</Button>
+                  <Button size="sm" variant="ghost" className="text-red-600" onClick={() => setDraft(toggleItem(draft, widget))}>Hide</Button>
                 </div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium">Add your accounts</h4>
-                <p className="text-sm text-muted-foreground">Set up your bank accounts, cash, and credit cards</p>
-                {accounts.length === 0 && (
-                  <Link href="/dashboard/accounts">
-                    <Button variant="outline" size="sm" className="mt-2">Go to Accounts</Button>
-                  </Link>
-                )}
-              </div>
+              )}
+              {renderWidget(item.id)}
             </div>
-
-            <div className="flex items-start space-x-4">
-              <div className="flex-shrink-0">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground">2</div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-medium">Record your first transaction</h4>
-                <p className="text-sm text-muted-foreground">Track income and expenses in seconds</p>
-                <p className="text-sm text-primary mt-2">Click the + button in the bottom right corner!</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Recent Transactions</CardTitle>
-              <CardDescription>Your latest financial activity</CardDescription>
-            </div>
-            <Link href="/dashboard/transactions">
-              <Button variant="outline" size="sm">View All</Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTransactions.map((transaction) => {
-                const { text, className } = formatTransactionAmount(transaction.amount, transaction.type);
-                return (
-                  <div key={transaction.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div className="flex-1">
-                      <p className="font-medium">{transaction.title || getCategoryName(transaction.category_id)}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>{format(new Date(transaction.date), 'MMM d, yyyy')}</span>
-                        <span>•</span>
-                        <span>{getAccountName(transaction.account_id)}</span>
-                      </div>
-                    </div>
-                    <div className={`font-semibold ${className}`}>{text}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -268,7 +268,30 @@ The `tags text[]` column already exists. Add tag chips in the dialogs, read `#ta
 - **Filters:** a filter builder with amount range, notes contains, uncategorised, cleared, tag and schedule, run as a query with `pg_trgm` for fast text search. Users can save filters.
 - **Bulk edit:** select rows, then set category, tags or cleared. Changing a category this way offers to create a rule.
 
-## Phase 5: Reports and dashboard
+## Phase 5: Reports and dashboard (done, November 2026)
+
+**What shipped:**
+- **Migration 019:** `report_cash_flow` (by month or payday cycle, with a running total, transfers left out), `report_net_worth` (assets, debts and net worth at each month end) and `report_spending_compared` (this cycle, last cycle and the 3-cycle average, with split parts). All of them run with the user's own rights, limited to `auth.uid()`. It also adds `user_profiles.dashboard_layout`.
+- **Reports page:** cash flow, net worth, a "where the money went" flow chart, spending compared, budget analysis over six cycles, and a calendar of daily spending and scheduled payments. Each report has a CSV download.
+- **Dashboard:** cards you can add, hide, reorder and resize:
+  - summary
+  - coming up
+  - budget month
+  - cash flow
+  - net worth
+  - recent transactions
+  - spending compared
+  - debt-free date
+  - TFSA room
+
+  The layout is saved per user, and "Reset" restores the default.
+- **Tests:** the calendar, money flow and layout helpers are unit-tested.
+
+**Differences from the plan below:**
+- **Calculated in the browser:** the calendar and money flow use the transaction list the app already holds. Budget analysis calls `budget_month` once per cycle.
+- **Net worth:** it covers account balances only. Investments have no value history to chart yet.
+- **Fixed on the way:** the dashboard's "Total debt" card showed debts as negative and always counted 0 active debts. Debts have been stored as negative balances since migration 007.
+
 
 ### 5.1 Reports calculated on the server (M)
 

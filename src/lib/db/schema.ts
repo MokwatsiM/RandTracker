@@ -180,6 +180,8 @@ export interface UserProfile {
   theme: 'light' | 'dark' | 'system';
   /** Whether categorising a transaction teaches a rule for its payee. */
   rule_learning: boolean;
+  /** Dashboard cards in order; null or missing means the default layout. */
+  dashboard_layout?: { id: string; size: 'half' | 'full' }[] | null;
   /** Named transaction filters. */
   saved_filters?: { name: string; filter: import('@/lib/ledger/ledger').TransactionFilter }[];
   created_at: string;

@@ -13,7 +13,8 @@ import {
   BarChart3,
   Settings,
   Wand2,
-  CalendarClock
+  CalendarClock,
+  LineChart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,6 +29,7 @@ const navigation = [
   { name: 'Debts', href: '/dashboard/debts', icon: TrendingDown },
   { name: 'Goals', href: '/dashboard/goals', icon: Target },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { name: 'Reports', href: '/dashboard/reports', icon: LineChart },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 

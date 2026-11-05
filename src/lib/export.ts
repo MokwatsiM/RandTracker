@@ -5,7 +5,7 @@ import { format } from 'date-fns';
 /**
  * Convert array of objects to CSV string
  */
-function arrayToCSV(data: any[], headers: string[]): string {
+export function arrayToCSV(data: any[], headers: string[]): string {
   const csvRows = [];
 
   // Add headers
@@ -32,7 +32,7 @@ function arrayToCSV(data: any[], headers: string[]): string {
 /**
  * Download a string as a file
  */
-function downloadFile(content: string, filename: string, mimeType: string) {
+export function downloadFile(content: string, filename: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

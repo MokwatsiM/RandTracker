@@ -22,6 +22,7 @@ type RemoteUserProfile = {
   payday_date: number | null;
   rule_learning: boolean | null;
   saved_filters: UserProfile['saved_filters'] | null;
+  dashboard_layout: UserProfile['dashboard_layout'];
   created_at: string;
 };
 
@@ -150,6 +151,7 @@ function mapUserProfile(profile: RemoteUserProfile): UserProfile {
     theme: 'system',
     rule_learning: profile.rule_learning ?? true,
     saved_filters: profile.saved_filters ?? [],
+    dashboard_layout: profile.dashboard_layout ?? null,
     created_at: profile.created_at,
   };
 }
@@ -353,6 +355,7 @@ export async function updateUserProfile(profileId: string, updates: Partial<User
       payday_date: updates.payday_date,
       rule_learning: updates.rule_learning,
       saved_filters: updates.saved_filters,
+      dashboard_layout: updates.dashboard_layout,
     })
     .eq('id', profileId)
     .select('*')
@@ -758,6 +761,45 @@ export async function reconcileAccount(accountId: string, statementBalance: numb
   }
   return data as number;
 }
+
+export interface CashFlowRow {
+  period_start: string;
+  income: number;
+  expenses: number;
+  net: number;
+  cumulative: number;
+}
+
+export interface NetWorthRow {
+  month_end: string;
+  assets: number;
+  liabilities: number;
+  net_worth: number;
+}
+
+export interface SpendingComparedRow {
+  category_id: string;
+  this_cycle: number;
+  last_cycle: number;
+  average_3: number;
+}
+
+async function rpcRows<T>(name: string, args: Record<string, unknown>): Promise<T[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc(name, args);
+  if (error) {
+    throw error;
+  }
+  return (data ?? []) as T[];
+}
+
+export const fetchCashFlow = (from: string, to: string, by: 'month' | 'cycle') =>
+  rpcRows<CashFlowRow>('report_cash_flow', { p_from: from, p_to: to, p_by: by });
+
+export const fetchNetWorth = (months: number) => rpcRows<NetWorthRow>('report_net_worth', { p_months: months });
+
+export const fetchSpendingCompared = (date: string) =>
+  rpcRows<SpendingComparedRow>('report_spending_compared', { p_date: date });
 
 export async function fetchSchedules(userId: string): Promise<Schedule[]> {
   const supabase = getSupabaseClient();
