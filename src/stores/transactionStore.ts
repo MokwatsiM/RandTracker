@@ -4,6 +4,7 @@ import type { Transaction } from '@/lib/db/schema';
 import {
   createTransactionRecord,
   createTransactionRecords,
+  updateTransactionRecords,
   fetchTransactions,
   fetchTransactionsByDateRange,
   softDeleteTransactionRecord,
@@ -42,7 +43,9 @@ interface TransactionStore {
   loadTransactions: (userId: string, options?: { force?: boolean }) => Promise<void>;
   loadTransactionsByDateRange: (userId: string, startDate: Date, endDate: Date) => Promise<void>;
   createTransaction: (transaction: NewTransaction) => Promise<Transaction>;
-  createTransactions: (transactions: NewTransaction[]) => Promise<Transaction[]>;
+  createTransactions: (transactions: NewTransaction[], options?: { skipImported?: boolean }) => Promise<Transaction[]>;
+  /** Saves many edited transactions in one request. */
+  updateTransactions: (transactions: Transaction[]) => Promise<void>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   getTransactionById: (id: string) => Transaction | undefined;
@@ -99,9 +102,9 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
     }
   },
 
-  createTransactions: async (transactionsData) => {
+  createTransactions: async (transactionsData, options) => {
     try {
-      const created = await createTransactionRecords(transactionsData);
+      const created = await createTransactionRecords(transactionsData, options);
       if (created.length > 0) {
         await reloadBalances(created[0].user_id);
         set((state) => ({
@@ -109,6 +112,21 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
         }));
       }
       return created;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      throw error;
+    }
+  },
+
+  updateTransactions: async (changed) => {
+    if (changed.length === 0) return;
+    try {
+      const saved = await updateTransactionRecords(changed);
+      const byId = new Map(saved.map((t) => [t.id, t]));
+      await reloadBalances(saved[0].user_id);
+      set((state) => ({
+        transactions: state.transactions.map((t) => byId.get(t.id) ?? t),
+      }));
     } catch (error) {
       set({ error: (error as Error).message });
       throw error;

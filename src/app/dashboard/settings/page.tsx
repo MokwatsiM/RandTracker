@@ -28,6 +28,7 @@ import { Download, FileDown } from 'lucide-react';
 export default function SettingsPage() {
   const { user: authUser, signOut } = useAuth();
   const localUser = useUserStore((state) => state.user);
+  const updateUserProfile = useUserStore((state) => state.updateProfile);
   const authMode = useUserStore((state) => state.authMode);
 
   const { profile, loadProfile, updateCurrency, updatePaydayDate } = useUserProfileStore();
@@ -205,6 +206,40 @@ export default function SettingsPage() {
             </div>
             <Button variant="outline" size="sm" onClick={() => setThemeDialogOpen(true)}>
               Change
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Rules */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rules</CardTitle>
+          <CardDescription>Automatic categories for imports and new transactions</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium">Learn from my changes</p>
+              <p className="text-sm text-muted-foreground">
+                When you change a transaction&apos;s category, use it for that payee next time
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={localUser?.rule_learning !== false}
+              onChange={(e) => updateUserProfile({ rule_learning: e.target.checked })}
+              aria-label="Learn from my changes"
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Manage rules</p>
+              <p className="text-sm text-muted-foreground">Create, edit and apply rules</p>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/rules">Open</Link>
             </Button>
           </div>
         </CardContent>

@@ -11,6 +11,7 @@ import type {
   UserProfile,
 } from '@/lib/db/schema';
 import { createClient } from '@/lib/supabase/client';
+import type { Rule, RuleDraft } from '@/lib/rules/types';
 
 type RemoteUserProfile = {
   id: string;
@@ -18,6 +19,7 @@ type RemoteUserProfile = {
   full_name: string | null;
   currency: string | null;
   payday_date: number | null;
+  rule_learning: boolean | null;
   created_at: string;
 };
 
@@ -65,6 +67,8 @@ type RemoteTransaction = {
   interest_portion: number | null;
   attachment_url: string | null;
   tags: string[] | null;
+  imported_payee: string | null;
+  imported_id: string | null;
   is_paid: boolean;
   exclude_from_budget: boolean;
   is_deleted: boolean;
@@ -136,6 +140,7 @@ function mapUserProfile(profile: RemoteUserProfile): UserProfile {
     currency: profile.currency ?? 'ZAR',
     payday_date: profile.payday_date ?? 25,
     theme: 'system',
+    rule_learning: profile.rule_learning ?? true,
     created_at: profile.created_at,
   };
 }
@@ -193,6 +198,8 @@ function mapTransaction(transaction: RemoteTransaction): Transaction {
     interest_portion: transaction.interest_portion ?? undefined,
     attachment_url: transaction.attachment_url ?? undefined,
     tags: transaction.tags ?? undefined,
+    imported_payee: transaction.imported_payee ?? undefined,
+    imported_id: transaction.imported_id ?? undefined,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     created_at: transaction.created_at,
@@ -266,6 +273,8 @@ function toRemoteTransaction(transaction: Transaction) {
     interest_portion: transaction.interest_portion ?? null,
     attachment_url: transaction.attachment_url ?? null,
     tags: transaction.tags ?? null,
+    imported_payee: transaction.imported_payee ?? null,
+    imported_id: transaction.imported_id ?? null,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     is_deleted: transaction.is_deleted,
@@ -314,6 +323,7 @@ export async function updateUserProfile(profileId: string, updates: Partial<User
       full_name: updates.display_name,
       currency: updates.currency,
       payday_date: updates.payday_date,
+      rule_learning: updates.rule_learning,
     })
     .eq('id', profileId)
     .select('*')
@@ -500,8 +510,12 @@ export async function createTransactionRecord(transaction: NewTransaction): Prom
 }
 
 // One request and one database statement: every row is saved or none is, and balances
-// are recalculated once for the whole batch.
-export async function createTransactionRecords(transactions: NewTransaction[]): Promise<Transaction[]> {
+// are recalculated once for the whole batch. With skipImported, rows whose imported_id is
+// already on the account are left out instead of failing the whole batch.
+export async function createTransactionRecords(
+  transactions: NewTransaction[],
+  options: { skipImported?: boolean } = {}
+): Promise<Transaction[]> {
   if (transactions.length === 0) {
     return [];
   }
@@ -518,17 +532,102 @@ export async function createTransactionRecords(transactions: NewTransaction[]): 
     })
   );
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert(payloads)
-    .select('*')
-    .returns<RemoteTransaction[]>();
+  const query = options.skipImported
+    ? supabase.from('transactions').upsert(payloads, { onConflict: 'account_id,imported_id', ignoreDuplicates: true })
+    : supabase.from('transactions').insert(payloads);
+  const { data, error } = await query.select('*').returns<RemoteTransaction[]>();
 
   if (error) {
     throw error;
   }
 
   return (data ?? []).map(mapTransaction);
+}
+
+/** Saves changed transactions in one request, so balances are recalculated once. */
+export async function updateTransactionRecords(transactions: Transaction[]): Promise<Transaction[]> {
+  if (transactions.length === 0) {
+    return [];
+  }
+  const supabase = getSupabaseClient();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('transactions')
+    .upsert(transactions.map((t) => toRemoteTransaction({ ...t, updated_at: now })), { onConflict: 'id' })
+    .select('*')
+    .returns<RemoteTransaction[]>();
+
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).map(mapTransaction);
+}
+
+/** Which of these import IDs already exist on the account, including deleted rows. */
+export async function fetchExistingImportIds(accountId: string, importIds: string[]): Promise<Set<string>> {
+  const supabase = getSupabaseClient();
+  const found = new Set<string>();
+  // Kept small so the request URL stays well under the gateway's 8 KB line limit.
+  for (let i = 0; i < importIds.length; i += 40) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('imported_id')
+      .eq('account_id', accountId)
+      .in('imported_id', importIds.slice(i, i + 40))
+      .returns<{ imported_id: string }[]>();
+    if (error) {
+      throw error;
+    }
+    for (const row of data ?? []) found.add(row.imported_id);
+  }
+  return found;
+}
+
+export async function fetchRules(userId: string): Promise<Rule[]> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('rules')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at')
+    .returns<Rule[]>();
+  if (error) {
+    throw error;
+  }
+  return data ?? [];
+}
+
+export async function createRuleRecords(userId: string, drafts: RuleDraft[]): Promise<Rule[]> {
+  if (drafts.length === 0) {
+    return [];
+  }
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('rules')
+    .insert(drafts.map((draft) => ({ ...draft, user_id: userId })))
+    .select('*')
+    .returns<Rule[]>();
+  if (error) {
+    throw error;
+  }
+  return data ?? [];
+}
+
+export async function updateRuleRecord(id: string, updates: Partial<RuleDraft>): Promise<Rule> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.from('rules').update(updates).eq('id', id).select('*').single<Rule>();
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+export async function deleteRuleRecord(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('rules').delete().eq('id', id);
+  if (error) {
+    throw error;
+  }
 }
 
 export async function updateTransactionRecord(id: string, updates: Partial<Transaction>): Promise<Transaction> {

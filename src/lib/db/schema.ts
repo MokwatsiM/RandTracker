@@ -29,6 +29,8 @@ export interface Account {
 
   is_archived: boolean;
   sort_order: number;
+  /** Remembered import settings, such as the CSV column mapping. */
+  import_settings?: { csv?: import('@/lib/import/csv').CsvMapping } | null;
   created_at: string;
   updated_at: string;
   synced_at?: string;
@@ -68,6 +70,10 @@ export interface Transaction {
   // Metadata
   attachment_url?: string;
   tags?: string[];
+  /** The bank's description, unchanged, for transactions that were imported. */
+  imported_payee?: string;
+  /** Stops the same statement row being imported twice into an account. */
+  imported_id?: string;
   is_paid: boolean;
   exclude_from_budget: boolean;
 
@@ -159,5 +165,7 @@ export interface UserProfile {
   currency: string;
   payday_date: number;
   theme: 'light' | 'dark' | 'system';
+  /** Whether categorising a transaction teaches a rule for its payee. */
+  rule_learning: boolean;
   created_at: string;
 }

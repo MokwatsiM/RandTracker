@@ -89,7 +89,22 @@ The statement dialog saves every row in a single insert, which PostgREST runs as
 - **Landing page:** the untrue "Offline First" card now says "Private by Design".
 - **Related fix:** the dashboard and accounts page total was subtracting asset balances. It's now the plain sum, because liabilities are stored as negative numbers.
 
-## Phase 1: Rules and better imports
+## Phase 1: Rules and better imports (done, November 2026)
+
+**What shipped:**
+- **Database:** migrations 013 (`rules`, `transactions.imported_payee`, `user_profiles.rule_learning`) and 014 (`transactions.imported_id` with a unique index per account, `accounts.import_settings`).
+- **Rules engine:** in `src/lib/rules/`, used by the import dialog, the transaction dialog (it suggests a category when you type a title) and the new Rules page.
+- **Learning:** changing a category teaches that payee's learned rule. Retitling an imported transaction offers a rename rule. Learning can be turned off in Settings.
+- **Starter rules:** about 20 rules covering common South African merchants, added from the Rules page.
+- **Importers:** CSV, OFX, QFX and QIF parsers sit alongside the FNB PDF parser. The CSV column mapping is saved per account.
+- **Import review:** shows each row's category and where it came from, already-imported rows (left out), and possible duplicates (unticked). It also compares the statement's closing balance with the account.
+- **Tests:** 49 Vitest unit tests, which the Docker build runs before every deploy.
+
+**Differences from the plan below:**
+- **Merchant map:** the FNB PDF parser's map still exists, but only as a fallback hint when no rule sets a category. The starter rules replace it.
+- **Rule order:** rules run in specificity order, which can't be dragged into a different order.
+- **Bulk edit:** "apply to matching transactions" changes everything a rule matches at once. Selecting individual rows to bulk-edit is still part of Phase 4.
+
 
 ### 1.1 Rules engine (L)
 

@@ -18,6 +18,9 @@ import { useTransactionStore } from '@/stores/transactionStore';
 import { useAccountStore } from '@/stores/accountStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useDebtStore } from '@/stores/debtStore';
+import { useRuleStore } from '@/stores/ruleStore';
+import { applyRules } from '@/lib/rules/engine';
+import type { RuleSubject } from '@/lib/rules/types';
 import { useUserStore } from '@/stores/userStore';
 import type { Transaction } from '@/lib/db/schema';
 
@@ -52,13 +55,49 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
   const { categories, subcategories } = useCategoryStore();
   const { debts, loadDebts } = useDebtStore();
 
+  const { rules, loadRules, learnCategories, planRename, saveChange } = useRuleStore();
+
   const [formData, setFormData] = useState(getInitialFormData(transaction));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Rules only fill in the category until the user picks one themselves.
+  const [categoryTouched, setCategoryTouched] = useState(false);
 
   // Reset form data when transaction prop changes or dialog opens/closes
   useEffect(() => {
     setFormData(getInitialFormData(transaction));
+    setCategoryTouched(false);
   }, [transaction, open]);
+
+  useEffect(() => {
+    if (open && user) {
+      void loadRules(user.id);
+    }
+  }, [loadRules, open, user]);
+
+  // For a new transaction, rules suggest a category from the title.
+  const suggestCategory = () => {
+    if (transaction || categoryTouched || formData.type === 'transfer' || !formData.title.trim() || !formData.account_id) {
+      return;
+    }
+    const subject: RuleSubject = {
+      title: formData.title,
+      account_id: formData.account_id,
+      type: formData.type,
+      amount: Math.round(parseFloat(formData.amount || '0') * 100),
+      date: formData.date,
+      category_id: null,
+    };
+    const { subject: result } = applyRules(subject, rules, {
+      categoryTypes: new Map(categories.map((c) => [c.id, c.type])),
+    });
+    if (result.category_id) {
+      setFormData((current) => ({
+        ...current,
+        category_id: result.category_id ?? '',
+        subcategory_id: result.subcategory_id ?? '',
+      }));
+    }
+  };
 
   useEffect(() => {
     if (open && user) {
@@ -74,6 +113,39 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
   // Filter categories by type
   const filteredCategories = categories.filter(c => c.type === formData.type);
   const activeDebts = debts.filter((debt) => debt.is_active);
+
+  // A changed category teaches the payee's learned rule. A changed title on an imported
+  // transaction can become a rule that renames future ones.
+  const learnFromEdit = async (before: Transaction, after: Partial<Transaction>) => {
+    if (!user) return;
+    try {
+      const subject: RuleSubject = {
+        imported_payee: before.imported_payee ?? null,
+        title: after.title ?? before.title,
+        account_id: after.account_id ?? before.account_id,
+        type: after.type ?? before.type,
+        amount: after.amount ?? before.amount,
+        date: after.date ?? before.date,
+        category_id: after.category_id || null,
+      };
+      if (user.rule_learning !== false && categoryTouched && after.category_id && after.category_id !== before.category_id) {
+        const all = useTransactionStore.getState().transactions;
+        await learnCategories(user.id, [subject], all);
+      }
+      if (after.title && after.title !== before.title) {
+        const rename = planRename({ imported_payee: before.imported_payee }, after.title);
+        if (
+          rename &&
+          window.confirm(`Rename future "${before.imported_payee}" transactions to "${after.title}" too?`)
+        ) {
+          await saveChange(user.id, rename);
+        }
+      }
+    } catch (error) {
+      // The transaction itself is saved; a rule that failed to save can be added later.
+      console.error('Failed to update rules:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -125,6 +197,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
       if (transaction) {
         await updateTransaction(transaction.id, transactionData);
+        await learnFromEdit(transaction, transactionData);
       } else {
         await createTransaction(transactionData);
       }
@@ -247,11 +320,14 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
                 <Select
                   id="category_id"
                   value={formData.category_id}
-                  onChange={(e) => setFormData({
-                    ...formData,
-                    category_id: e.target.value,
-                    subcategory_id: '' // Reset subcategory when category changes
-                  })}
+                  onChange={(e) => {
+                    setCategoryTouched(true);
+                    setFormData({
+                      ...formData,
+                      category_id: e.target.value,
+                      subcategory_id: '' // Reset subcategory when category changes
+                    });
+                  }}
                 >
                   <option value="">Select category</option>
                   {filteredCategories.map((category) => (
@@ -348,6 +424,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
               id="title"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onBlur={suggestCategory}
               placeholder="e.g., Groceries at Pick n Pay"
             />
           </div>

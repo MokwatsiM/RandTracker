@@ -11,13 +11,15 @@ import {
   TrendingUp,
   Target,
   BarChart3,
-  Settings
+  Settings,
+  Wand2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Transactions', href: '/dashboard/transactions', icon: Receipt },
+  { name: 'Rules', href: '/dashboard/rules', icon: Wand2 },
   { name: 'Accounts', href: '/dashboard/accounts', icon: CreditCard },
   { name: 'Budgets', href: '/dashboard/budgets', icon: PiggyBank },
   { name: 'Investments', href: '/dashboard/investments', icon: TrendingUp },
