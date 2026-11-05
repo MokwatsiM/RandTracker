@@ -25,6 +25,8 @@ import { formatZAR, calculatePercentage } from '@/lib/currency';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import type { Transaction } from '@/lib/db/schema';
 import { ReconcilePanel } from '@/components/accounts/ReconcilePanel';
+import { AccountDialog } from '@/components/accounts/AccountDialog';
+import { TransactionDialog } from '@/components/transactions/TransactionDialog';
 import { runningBalances } from '@/lib/ledger/ledger';
 import { CheckCircle2, Lock } from 'lucide-react';
 
@@ -39,6 +41,10 @@ export default function AccountDetailsPage() {
   const { categories, loadCategories } = useCategoryStore();
 
   const [timeRange, setTimeRange] = useState<'1m' | '3m' | '6m' | 'all'>('3m');
+  // Both buttons in the header used to do nothing useful: Edit had no handler, and New
+  // Transaction went to the transactions page without the account.
+  const [editOpen, setEditOpen] = useState(false);
+  const [transactionDialogOpen, setTransactionDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -109,7 +115,7 @@ export default function AccountDetailsPage() {
 
   if (!account) {
     return (
-      <div className="container max-w-7xl mx-auto p-6">
+      <div className="container max-w-7xl mx-auto p-0 md:p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Account not found</p>
@@ -139,10 +145,10 @@ export default function AccountDetailsPage() {
     : 0;
 
   return (
-    <div className="container max-w-7xl mx-auto p-6 space-y-6">
+    <div className="container max-w-7xl mx-auto p-0 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Button
             variant="ghost"
             size="sm"
@@ -158,7 +164,7 @@ export default function AccountDetailsPage() {
               {account.icon}
             </div>
             <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
+              <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
                 {account.name}
                 {account.is_primary && (
                   <Star className="h-5 w-5 fill-yellow-500 text-yellow-500" />
@@ -170,12 +176,12 @@ export default function AccountDetailsPage() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push(`/dashboard/transactions?account=${accountId}`)}>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setTransactionDialogOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             New Transaction
           </Button>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4" />
             Edit Account
           </Button>
@@ -497,6 +503,8 @@ export default function AccountDetailsPage() {
           )}
         </CardContent>
       </Card>
+      <AccountDialog open={editOpen} onOpenChange={setEditOpen} account={account} />
+      <TransactionDialog open={transactionDialogOpen} onOpenChange={setTransactionDialogOpen} defaultAccountId={accountId} />
     </div>
   );
 }

@@ -49,7 +49,7 @@ const LIABILITIES = ['credit_card', 'loan', 'store_card'];
 
 function Widget({ title, description, link, children }: { title: string; description?: string; link?: { href: string; label: string }; children: React.ReactNode }) {
   return (
-    <Card className="h-full">
+    <Card className="h-full min-w-0">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
           <CardTitle>{title}</CardTitle>
@@ -91,16 +91,16 @@ function SummaryWidget() {
     { label: 'Total debt', value: formatZAR(totalDebt), note: `${debtAccounts.length} account${debtAccounts.length === 1 ? '' : 's'} with debt`, icon: TrendingDown, tone: '' },
   ];
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {stats.map((s) => (
-        <Card key={s.label}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{s.label}</CardTitle>
-            <s.icon className="h-4 w-4 text-muted-foreground" />
+        <Card key={s.label} className="min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 p-3 pb-1 sm:p-6 sm:pb-2">
+            <CardTitle className="truncate text-xs font-medium sm:text-sm">{s.label}</CardTitle>
+            <s.icon className="hidden h-4 w-4 flex-shrink-0 text-muted-foreground sm:block" />
           </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${s.tone}`}>{s.value}</div>
-            <p className="text-xs text-muted-foreground">{s.note}</p>
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            <div className={`truncate text-lg font-bold sm:text-2xl ${s.tone}`}>{s.value}</div>
+            <p className="truncate text-xs text-muted-foreground">{s.note}</p>
           </CardContent>
         </Card>
       ))}

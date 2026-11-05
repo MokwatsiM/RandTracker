@@ -10,16 +10,31 @@ interface DialogProps {
   children: React.ReactNode;
 }
 
+// On phones a dialog slides up from the bottom and fills the width; from the sm
+// breakpoint it's centred. The width comes from DialogContent, so a dialog can ask to be
+// wider (max-w-3xl and so on) instead of being held to the default.
 export function Dialog({ open, onOpenChange, children }: DialogProps) {
+  React.useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onOpenChange(false);
+    document.addEventListener('keydown', onKey);
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [open, onOpenChange]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4" role="dialog" aria-modal="true">
       <div
         className="fixed inset-0 bg-black/50"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50 w-full max-w-lg mx-4">
+      <div className="relative z-50 flex w-full justify-center">
         {children}
       </div>
     </div>
@@ -34,7 +49,8 @@ export function DialogContent({
   return (
     <div
       className={cn(
-        'relative bg-card rounded-lg shadow-lg p-6',
+        'relative w-full max-w-lg max-h-[92dvh] overflow-y-auto bg-card shadow-lg animate-slide-up',
+        'rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:rounded-lg sm:p-6 sm:animate-none',
         className
       )}
       {...props}

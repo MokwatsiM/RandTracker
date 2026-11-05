@@ -167,13 +167,13 @@ export default function RulesPage() {
   if (!user) return null;
 
   return (
-    <div className="container max-w-5xl mx-auto p-6 space-y-6">
+    <div className="container max-w-5xl mx-auto p-0 md:p-6 space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Rules</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Rules</h1>
           <p className="text-muted-foreground mt-1">Categorise and clean up transactions automatically</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!hasStarter && (
             <Button variant="outline" onClick={() => void addStarterRules()} disabled={busy !== null}>
               <Sparkles className="mr-2 h-4 w-4" />

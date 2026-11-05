@@ -45,13 +45,13 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Dashboard</h1>
           <p className="text-muted-foreground">Welcome back{user.display_name ? `, ${user.display_name}` : ''}!</p>
         </div>
         {editing ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="ghost" onClick={() => setDraft(DEFAULT_LAYOUT)}>Reset</Button>
             <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
             <Button onClick={save}>Save layout</Button>
@@ -84,7 +84,7 @@ export default function DashboardPage() {
         {layout.map((item, index) => {
           const widget = WIDGETS.find((w) => w.id === item.id)!;
           return (
-            <div key={item.id} className={`relative ${item.size === 'full' ? 'lg:col-span-2' : ''} ${editing ? 'rounded-lg outline-dashed outline-2 outline-offset-2 outline-primary/40' : ''}`}>
+            <div key={item.id} className={`relative min-w-0 ${item.size === 'full' ? 'lg:col-span-2' : ''} ${editing ? 'rounded-lg outline-dashed outline-2 outline-offset-2 outline-primary/40' : ''}`}>
               {editing && (
                 <div className="absolute right-2 top-2 z-10 flex gap-1 rounded-md bg-background/90 p-1 shadow">
                   <Button size="sm" variant="ghost" disabled={index === 0} onClick={() => setDraft(moveItem(draft, item.id, -1))} aria-label={`Move ${widget.title} up`}><ArrowUp className="h-4 w-4" /></Button>

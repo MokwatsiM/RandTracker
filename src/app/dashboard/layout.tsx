@@ -36,7 +36,8 @@ export default function DashboardLayout({
 
       {/* Main content */}
       <div className="md:pl-64">
-        <main className="py-6 px-4 md:px-8 pb-20 md:pb-6">
+        {/* Room at the bottom on phones for the tab bar and the + button. */}
+        <main className="py-6 px-4 md:px-8 pb-40 md:pb-6">
           {children}
         </main>
       </div>

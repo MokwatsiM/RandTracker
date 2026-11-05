@@ -184,7 +184,7 @@ export function RuleDialog({ open, onOpenChange, rule, onSave }: RuleDialogProps
             <Label>If</Label>
             <div className="mt-2 space-y-2">
               {conditions.map((c, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1fr_1.4fr_auto] gap-2">
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-[1fr_1fr_1.4fr_auto] sm:border-0 sm:p-0">
                   <Select
                     value={c.field}
                     onChange={(e) => {
@@ -222,7 +222,7 @@ export function RuleDialog({ open, onOpenChange, rule, onSave }: RuleDialogProps
                       aria-label="Condition value"
                     />
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setConditions(conditions.filter((_, j) => j !== i))} aria-label="Remove condition">
+                  <Button variant="ghost" size="sm" onClick={() => setConditions(conditions.filter((_, j) => j !== i))} aria-label="Remove condition" className="justify-self-end">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -241,7 +241,7 @@ export function RuleDialog({ open, onOpenChange, rule, onSave }: RuleDialogProps
             <Label>Then</Label>
             <div className="mt-2 space-y-2">
               {actions.map((a, i) => (
-                <div key={i} className="grid grid-cols-[1fr_1.6fr_auto] gap-2">
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-2 sm:grid-cols-[1fr_1.6fr_auto] sm:border-0 sm:p-0">
                   <Select
                     value={a.field}
                     onChange={(e) => setActions(actions.map((x, j) => (j === i ? { field: e.target.value as ActionField, value: '' } : x)))}
@@ -268,7 +268,7 @@ export function RuleDialog({ open, onOpenChange, rule, onSave }: RuleDialogProps
                       aria-label="Action value"
                     />
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => setActions(actions.filter((_, j) => j !== i))} aria-label="Remove action">
+                  <Button variant="ghost" size="sm" onClick={() => setActions(actions.filter((_, j) => j !== i))} aria-label="Remove action" className="justify-self-end">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>

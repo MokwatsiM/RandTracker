@@ -12,7 +12,8 @@ export function FAB({ onClick }: FABProps) {
     <Button
       onClick={onClick}
       size="icon"
-      className="fixed bottom-20 md:bottom-8 right-4 md:right-8 h-14 w-14 rounded-full shadow-lg z-40"
+      aria-label="Add a transaction"
+      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-8 right-4 md:right-8 h-14 w-14 rounded-full shadow-lg z-40"
     >
       <Plus className="h-6 w-6" />
     </Button>

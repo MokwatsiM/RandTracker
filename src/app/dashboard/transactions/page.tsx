@@ -195,27 +195,27 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap justify-between items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Transactions</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Transactions</h1>
           <p className="text-muted-foreground">Track all your income and expenses</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
             <Upload className="mr-2 h-4 w-4" />
-            Import Statement
+            Import<span className="hidden sm:inline">&nbsp;Statement</span>
           </Button>
           <Button onClick={() => { setSelectedTransaction(undefined); setDialogOpen(true); }}>
             <Plus className="mr-2 h-4 w-4" />
-            Add Transaction
+            Add<span className="hidden sm:inline">&nbsp;Transaction</span>
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Income</p><p className="text-2xl font-bold text-green-600">{formatZAR(totals.income)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Expenses</p><p className="text-2xl font-bold text-red-600">{formatZAR(totals.expenses)}</p></CardContent></Card>
-        <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Net</p><p className={`text-2xl font-bold ${totals.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatZAR(totals.net)}</p></CardContent></Card>
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
+        <Card><CardContent className="p-2.5 sm:p-6"><p className="text-xs text-muted-foreground sm:text-sm">Income</p><p className="text-[13px] font-bold tracking-tight sm:text-2xl text-green-600">{formatZAR(totals.income)}</p></CardContent></Card>
+        <Card><CardContent className="p-2.5 sm:p-6"><p className="text-xs text-muted-foreground sm:text-sm">Expenses</p><p className="text-[13px] font-bold tracking-tight sm:text-2xl text-red-600">{formatZAR(totals.expenses)}</p></CardContent></Card>
+        <Card><CardContent className="p-2.5 sm:p-6"><p className="text-xs text-muted-foreground sm:text-sm">Net</p><p className={`text-[13px] font-bold tracking-tight sm:text-2xl ${totals.net >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatZAR(totals.net)}</p></CardContent></Card>
       </div>
 
       <Card>

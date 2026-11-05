@@ -33,6 +33,8 @@ interface TransactionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   transaction?: Transaction;
+  /** Account to start a new transaction on. */
+  defaultAccountId?: string;
 }
 
 const getInitialFormData = (transaction?: Transaction) => ({
@@ -57,7 +59,7 @@ const getInitialFormData = (transaction?: Transaction) => ({
   cleared: transaction?.cleared ?? false,
 });
 
-export function TransactionDialog({ open, onOpenChange, transaction }: TransactionDialogProps) {
+export function TransactionDialog({ open, onOpenChange, transaction, defaultAccountId }: TransactionDialogProps) {
   const user = useUserStore(state => state.user);
   const { createTransaction, updateTransaction } = useTransactionStore();
   const { accounts } = useAccountStore();
@@ -75,10 +77,10 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
   // Reset form data when transaction prop changes or dialog opens/closes
   useEffect(() => {
-    setFormData(getInitialFormData(transaction));
+    setFormData({ ...getInitialFormData(transaction), ...(!transaction && defaultAccountId ? { account_id: defaultAccountId } : {}) });
     setCategoryTouched(false);
     setFormError(null);
-  }, [transaction, open]);
+  }, [transaction, open, defaultAccountId]);
 
   useEffect(() => {
     if (open && user) {

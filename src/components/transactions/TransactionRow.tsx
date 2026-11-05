@@ -40,7 +40,13 @@ export function TransactionRow({
   const isFutureTransaction = isFuture(parseISO(transaction.date));
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 hover:bg-accent/50 rounded-lg transition-colors border-b last:border-0">
+    <div
+      className="flex items-center justify-between gap-2 py-3 px-2 sm:px-4 hover:bg-accent/50 rounded-lg transition-colors border-b last:border-0 cursor-pointer sm:cursor-default"
+      onClick={(e) => {
+        // On phones the whole row opens the transaction; buttons and the checkbox keep their own job.
+        if (window.matchMedia('(max-width: 639px)').matches && !(e.target as HTMLElement).closest('button, input, a')) onEdit(transaction);
+      }}
+    >
       {/* Left: Icon + Details */}
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {onSelect && (
@@ -53,7 +59,7 @@ export function TransactionRow({
           />
         )}
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${
+          className={`hidden sm:flex w-10 h-10 flex-shrink-0 rounded-full items-center justify-center ${
             isIncome
               ? 'bg-green-100 dark:bg-green-950'
               : isTransfer
@@ -104,22 +110,25 @@ export function TransactionRow({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className={isFutureTransaction ? 'text-amber-600 dark:text-amber-400' : ''}>
-              {format(new Date(transaction.date), 'MMM dd, yyyy')}
+          {/* On phones the title replaces the category line's details, which matter less. */}
+          {transaction.title && <p className="truncate text-sm sm:hidden">{transaction.title}</p>}
+          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground min-w-0">
+            <span className={`flex-shrink-0 whitespace-nowrap ${isFutureTransaction ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+              <span className="sm:hidden">{format(new Date(transaction.date), 'd MMM')}</span>
+              <span className="hidden sm:inline">{format(new Date(transaction.date), 'd MMM yyyy')}</span>
             </span>
-            <span>•</span>
-            <span>{account?.name || 'Unknown Account'}</span>
+            <span className="flex-shrink-0">•</span>
+            <span className="truncate">{account?.name || 'Unknown Account'}</span>
             {transaction.title && (
               <>
-                <span>•</span>
-                <span className="truncate max-w-[200px]">{transaction.title}</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline truncate max-w-[200px]">{transaction.title}</span>
               </>
             )}
             {isFutureTransaction && (
               <>
                 <span>•</span>
-                <span className="text-amber-600 dark:text-amber-400 text-xs">Not affecting balance yet</span>
+                <span className="hidden sm:inline text-amber-600 dark:text-amber-400 text-xs">Not affecting balance yet</span>
               </>
             )}
           </div>
@@ -134,7 +143,7 @@ export function TransactionRow({
       </div>
 
       {/* Right: Amount + Actions */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-shrink-0 flex-col items-end gap-0.5 sm:flex-row sm:items-center sm:gap-4">
         <div className="text-right">
           <p className={`font-semibold ${
             isIncome
@@ -149,17 +158,17 @@ export function TransactionRow({
         </div>
 
         {/* Actions */}
-        <div className="flex gap-1">
+        <div className="flex gap-0.5 sm:gap-1">
           <button
             onClick={() => onEdit(transaction)}
-            className="p-2 hover:bg-accent rounded-md transition-colors"
+            className="hidden sm:block p-2 hover:bg-accent rounded-md transition-colors"
             aria-label="Edit transaction"
           >
             <Edit className="h-4 w-4" />
           </button>
           <button
             onClick={() => onDelete(transaction)}
-            className="p-2 hover:bg-red-50 dark:hover:bg-red-950 text-red-600 rounded-md transition-colors"
+            className="p-1.5 sm:p-2 hover:bg-red-50 dark:hover:bg-red-950 text-red-600 rounded-md transition-colors"
             aria-label="Delete transaction"
           >
             <Trash2 className="h-4 w-4" />

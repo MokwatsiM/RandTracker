@@ -109,7 +109,7 @@ export default function GoalsPage() {
 
   if (isLoading) {
     return (
-      <div className="container max-w-7xl mx-auto p-6">
+      <div className="container max-w-7xl mx-auto p-0 md:p-6">
         <div className="flex items-center justify-center h-64">
           <p className="text-muted-foreground">Loading goals...</p>
         </div>
@@ -118,11 +118,11 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="container max-w-7xl mx-auto p-6 space-y-6">
+    <div className="container max-w-7xl mx-auto p-0 md:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Goals</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Goals</h1>
           <p className="text-muted-foreground mt-1">
             Track your savings targets and financial milestones
           </p>

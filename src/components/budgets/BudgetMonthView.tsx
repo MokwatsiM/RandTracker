@@ -169,11 +169,11 @@ export function BudgetMonthView() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Button variant="outline" size="sm" onClick={() => month && setDate(previousCycleStart(payday, month.cycle_start))} aria-label="Previous cycle">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="min-w-[14rem] text-center">
+          <div className="min-w-0 flex-1 text-center sm:min-w-[14rem] sm:flex-none">
             <p className="font-medium">{month ? cycleLabel(payday, month.cycle_start) : '...'}</p>
             <p className="text-xs text-muted-foreground">Payday on the {payday}{payday === 1 ? 'st' : payday === 2 ? 'nd' : payday === 3 ? 'rd' : 'th'}, or the working day before</p>
           </div>
@@ -251,7 +251,7 @@ export function BudgetMonthView() {
                     </div>
                   </div>
                   <Input
-                    className="h-8 text-right"
+                    className="h-8 w-28 text-right sm:w-full"
                     type="number"
                     step="0.01"
                     min="0"
@@ -262,12 +262,14 @@ export function BudgetMonthView() {
                     aria-label={`Assigned to ${c.name}`}
                     disabled={busy}
                   />
-                  <p className="text-right text-sm text-muted-foreground">{formatZAR(row?.spent ?? 0)}</p>
-                  <p className={`text-right text-sm font-medium ${available < 0 ? 'text-red-600' : available > 0 ? 'text-green-600' : ''}`}>
-                    {formatZAR(available)}
+                  <p className="text-sm text-muted-foreground sm:text-right">
+                    <span className="sm:hidden">Spent </span>{formatZAR(row?.spent ?? 0)}
                   </p>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setEditing({ categoryId: c.id, name: c.name })} aria-label={`Automation for ${c.name}`}>
-                    <Settings2 className="h-4 w-4" />
+                  <p className={`text-right text-sm font-medium ${available < 0 ? 'text-red-600' : available > 0 ? 'text-green-600' : ''}`}>
+                    <span className="font-normal text-muted-foreground sm:hidden">Available </span>{formatZAR(available)}
+                  </p>
+                  <Button variant="ghost" size="sm" className="col-span-2 h-8 justify-self-end p-0 px-2 sm:col-span-1 sm:w-8 sm:px-0" onClick={() => setEditing({ categoryId: c.id, name: c.name })} aria-label={`Automation for ${c.name}`}>
+                    <Settings2 className="h-4 w-4" /><span className="ml-1 text-xs sm:hidden">Automation</span>
                   </Button>
                 </div>
               );

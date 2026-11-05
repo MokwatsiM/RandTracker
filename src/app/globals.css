@@ -67,6 +67,12 @@
 }
 
 @layer base {
+  /* Grid columns may shrink below their content's natural width, so a wide chart or table
+     scrolls inside its card instead of making the whole page wider than a phone screen. */
+  .grid > * {
+    min-width: 0;
+  }
+
   * {
     @apply border-border;
   }

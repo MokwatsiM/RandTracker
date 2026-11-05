@@ -110,9 +110,9 @@ export default function DebtsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Debt Management</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Debt Management</h1>
           <p className="text-muted-foreground">Track loans, credit cards, and plan your payoff strategy</p>
         </div>
         <Button onClick={handleCreateDebt}>
@@ -262,7 +262,7 @@ export default function DebtsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-sm">
                 <thead>
                   <tr className="border-b text-left">
                     <th className="py-2 pr-4">Debt</th>
@@ -285,7 +285,7 @@ export default function DebtsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </CardContent>
           </Card>
 
@@ -297,7 +297,7 @@ export default function DebtsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-sm">
                 <thead>
                   <tr className="border-b text-left">
                     <th className="py-2 pr-4">Month</th>
@@ -322,7 +322,7 @@ export default function DebtsPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+              </table></div>
             </CardContent>
           </Card>
 
@@ -335,7 +335,7 @@ export default function DebtsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-sm">
                   <thead>
                     <tr className="border-b text-left">
                       <th className="py-2 pr-4">Month</th>
@@ -356,7 +356,7 @@ export default function DebtsPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
+                </table></div>
               </CardContent>
             </Card>
           )}

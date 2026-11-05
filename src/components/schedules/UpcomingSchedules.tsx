@@ -15,7 +15,7 @@ import { useAccountStore } from '@/stores/accountStore';
 
 export function formatScheduleAmount(s: Pick<Schedule, 'amount' | 'amount_type' | 'amount_min' | 'amount_max'>): string {
   if (s.amount_type === 'range') return `${formatZAR(s.amount_min ?? 0)} – ${formatZAR(s.amount_max ?? 0)}`;
-  return `${s.amount_type === 'approx' ? '~' : ''}${formatZAR(s.amount)}`;
+  return `${s.amount_type === 'approx' ? '≈ ' : ''}${formatZAR(s.amount)}`;
 }
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -107,7 +107,7 @@ export function UpcomingSchedules({ days, limit }: UpcomingSchedulesProps) {
           <p className="text-sm font-medium">Waiting for you</p>
           {waiting.map(({ schedule: s, date }) => (
             <div key={s.id} className="flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-800 dark:bg-amber-950/20">
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
                 <p className="font-medium">{s.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {relativeDay(date, today)} · {account(s.account_id)} · expected {formatScheduleAmount(s)}
@@ -117,7 +117,7 @@ export function UpcomingSchedules({ days, limit }: UpcomingSchedulesProps) {
                 <Input
                   type="number"
                   step="0.01"
-                  className="h-8 w-28"
+                  className="h-8 w-24 sm:w-28"
                   placeholder={(s.amount / 100).toFixed(2)}
                   value={amounts[s.id] ?? ''}
                   onChange={(e) => setAmounts({ ...amounts, [s.id]: e.target.value })}
@@ -146,8 +146,8 @@ export function UpcomingSchedules({ days, limit }: UpcomingSchedulesProps) {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {!s.auto_add && <Badge variant="outline">Asks first</Badge>}
-                <span className={s.type === 'income' ? 'text-green-600' : 'text-red-600'}>
+                {!s.auto_add && <Badge variant="outline" className="hidden sm:inline-flex">Asks first</Badge>}
+                <span className={`whitespace-nowrap ${s.type === 'income' ? 'text-green-600' : 'text-red-600'}`}>
                   {s.type === 'income' ? '+' : '-'}
                   {formatScheduleAmount(s)}
                 </span>

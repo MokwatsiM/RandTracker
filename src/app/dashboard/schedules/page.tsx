@@ -89,13 +89,13 @@ export default function SchedulesPage() {
   );
 
   return (
-    <div className="container max-w-5xl mx-auto p-6 space-y-6">
+    <div className="container max-w-5xl mx-auto p-0 md:p-6 space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Schedules</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Schedules</h1>
           <p className="text-muted-foreground mt-1">Debit orders, subscriptions and other payments you expect</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => setShowSuggestions(!showSuggestions)}>
             <Search className="mr-2 h-4 w-4" />
             Find schedules

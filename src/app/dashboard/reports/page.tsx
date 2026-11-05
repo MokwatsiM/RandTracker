@@ -108,12 +108,12 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Reports</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Reports</h1>
           <p className="text-muted-foreground">Cash flow, net worth and where your money goes</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Select className="w-auto" value={months} onChange={(e) => setMonths(Number(e.target.value))} aria-label="Period">
             <option value={3}>Last 3 months</option>
             <option value={6}>Last 6 months</option>
@@ -206,10 +206,10 @@ export default function ReportsPage() {
               <table className="w-full text-sm">
                 <thead className="text-xs text-muted-foreground">
                   <tr className="border-b">
-                    <th className="p-3 text-left font-medium">Category</th>
-                    <th className="p-3 text-right font-medium">This cycle</th>
-                    <th className="p-3 text-right font-medium">Last</th>
-                    <th className="p-3 text-right font-medium">Average</th>
+                    <th className="p-2 sm:p-3 text-left font-medium">Category</th>
+                    <th className="p-2 sm:p-3 text-right font-medium">This cycle</th>
+                    <th className="p-2 sm:p-3 text-right font-medium">Last</th>
+                    <th className="p-2 sm:p-3 text-right font-medium">Average</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -217,10 +217,10 @@ export default function ReportsPage() {
                     const up = r.average_3 > 0 && r.this_cycle > r.average_3 * 1.1;
                     return (
                       <tr key={r.category_id}>
-                        <td className="p-3">{categoryName(r.category_id)}</td>
+                        <td className="p-2 sm:p-3">{categoryName(r.category_id)}</td>
                         <td className={`p-3 text-right font-medium ${up ? 'text-red-600' : ''}`}>{formatZAR(r.this_cycle)}{up ? ' ▲' : ''}</td>
-                        <td className="p-3 text-right text-muted-foreground">{formatZAR(r.last_cycle)}</td>
-                        <td className="p-3 text-right text-muted-foreground">{formatZAR(r.average_3)}</td>
+                        <td className="p-2 sm:p-3 text-right text-muted-foreground">{formatZAR(r.last_cycle)}</td>
+                        <td className="p-2 sm:p-3 text-right text-muted-foreground">{formatZAR(r.average_3)}</td>
                       </tr>
                     );
                   })}
@@ -257,10 +257,10 @@ export default function ReportsPage() {
             <table className="w-full text-sm">
               <thead className="text-xs text-muted-foreground">
                 <tr className="border-b">
-                  <th className="p-3 text-left font-medium">Cycle</th>
-                  <th className="p-3 text-right font-medium">Assigned</th>
-                  <th className="p-3 text-right font-medium">Spent</th>
-                  <th className="p-3 text-right font-medium">Left to budget</th>
+                  <th className="p-2 sm:p-3 text-left font-medium">Cycle</th>
+                  <th className="p-2 sm:p-3 text-right font-medium">Assigned</th>
+                  <th className="p-2 sm:p-3 text-right font-medium">Spent</th>
+                  <th className="p-2 sm:p-3 text-right font-medium">Left to budget</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -268,8 +268,8 @@ export default function ReportsPage() {
                   const spent = c.categories.reduce((s, x) => s + x.spent, 0);
                   return (
                     <tr key={c.cycle_start}>
-                      <td className="p-3">{cycleLabel(payday, c.cycle_start)}</td>
-                      <td className="p-3 text-right">{formatZAR(c.assigned)}</td>
+                      <td className="p-2 sm:p-3">{cycleLabel(payday, c.cycle_start)}</td>
+                      <td className="p-2 sm:p-3 text-right">{formatZAR(c.assigned)}</td>
                       <td className={`p-3 text-right ${spent > c.assigned ? 'text-red-600' : ''}`}>{formatZAR(spent)}</td>
                       <td className={`p-3 text-right ${c.to_budget < 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{formatZAR(c.to_budget)}</td>
                     </tr>

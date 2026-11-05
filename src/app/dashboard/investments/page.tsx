@@ -111,18 +111,20 @@ export default function InvestmentsPage() {
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 min-w-0">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => setViewingInvestment(null)}
+              aria-label="Back to investments"
             >
-              ← Back to Investments
+              ←<span className="ml-1 hidden sm:inline">Back to Investments</span>
             </Button>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{viewingInvestment.icon}</span>
-                <h1 className="text-3xl font-bold">{viewingInvestment.name}</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold">{viewingInvestment.name}</h1>
               </div>
               <p className="text-muted-foreground capitalize">
                 {viewingInvestment.type.replace('_', ' ')}
@@ -204,9 +206,9 @@ export default function InvestmentsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Investments</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Investments</h1>
           <p className="text-muted-foreground">Track your TFSA, stocks, ETFs, and other investments</p>
         </div>
         <div className="flex items-center gap-2">
