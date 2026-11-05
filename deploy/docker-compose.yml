@@ -143,7 +143,7 @@ services:
     <<: *logging
     image: supabase/postgres-meta:v0.100.0
     profiles: [admin]
-    mem_limit: 128m
+    mem_limit: 256m
     depends_on:
       db: { condition: service_healthy }
     environment:
