@@ -52,7 +52,7 @@ type RemoteTransaction = {
   date: string;
   time: string | null;
   is_recurring: boolean;
-  recurrence_frequency: Transaction['recurrence_rule'] extends { frequency: infer T } ? T : string | null;
+  recurrence_frequency: Transaction['recurrence_frequency'] | null;
   recurrence_interval: number | null;
   recurrence_end_date: string | null;
   recurrence_day_of_month: number | null;
@@ -161,14 +161,10 @@ function mapTransaction(transaction: RemoteTransaction): Transaction {
     date: transaction.date,
     time: transaction.time ?? undefined,
     is_recurring: transaction.is_recurring,
-    recurrence_rule: transaction.is_recurring
-      ? {
-          frequency: transaction.recurrence_frequency as NonNullable<Transaction['recurrence_rule']>['frequency'],
-          interval: transaction.recurrence_interval ?? undefined,
-          end_date: transaction.recurrence_end_date ?? undefined,
-          day_of_month: transaction.recurrence_day_of_month ?? undefined,
-        }
-      : undefined,
+    recurrence_frequency: transaction.recurrence_frequency ?? undefined,
+    recurrence_interval: transaction.recurrence_interval ?? undefined,
+    recurrence_end_date: transaction.recurrence_end_date ?? undefined,
+    recurrence_day_of_month: transaction.recurrence_day_of_month ?? undefined,
     is_subscription: transaction.is_subscription,
     transfer_account_id: transaction.transfer_account_id ?? undefined,
     linked_transaction_id: transaction.linked_transaction_id ?? undefined,
@@ -238,10 +234,10 @@ function toRemoteTransaction(transaction: Transaction) {
     date: transaction.date,
     time: transaction.time ?? null,
     is_recurring: transaction.is_recurring,
-    recurrence_frequency: transaction.recurrence_rule?.frequency ?? null,
-    recurrence_interval: transaction.recurrence_rule?.interval ?? null,
-    recurrence_end_date: transaction.recurrence_rule?.end_date ?? null,
-    recurrence_day_of_month: transaction.recurrence_rule?.day_of_month ?? null,
+    recurrence_frequency: transaction.recurrence_frequency ?? null,
+    recurrence_interval: transaction.recurrence_interval ?? null,
+    recurrence_end_date: transaction.recurrence_end_date ?? null,
+    recurrence_day_of_month: transaction.recurrence_day_of_month ?? null,
     is_subscription: transaction.is_subscription,
     transfer_account_id: transaction.transfer_account_id ?? null,
     linked_transaction_id: transaction.linked_transaction_id ?? null,

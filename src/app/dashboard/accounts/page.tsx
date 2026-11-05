@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, CreditCard, PiggyBank, Wallet, TrendingDown } from 'lucide-react';
+import { Plus, CreditCard, PiggyBank, Wallet, TrendingDown, LayoutGrid, List } from 'lucide-react';
 import { useAccountStore } from '@/stores/accountStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useUserStore } from '@/stores/userStore';
 import { AccountDialog } from '@/components/accounts/AccountDialog';
 import { AccountCard } from '@/components/accounts/AccountCard';
+import { AccountsTableView } from '@/components/accounts/AccountsTableView';
 import { formatZAR } from '@/lib/currency';
 import type { Account } from '@/lib/db/schema';
+
+type ViewMode = 'cards' | 'table';
 
 export default function AccountsPage() {
   const user = useUserStore(state => state.user);
@@ -19,6 +22,7 @@ export default function AccountsPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | undefined>();
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   useEffect(() => {
     if (user) {
@@ -71,10 +75,31 @@ export default function AccountsPage() {
           <h1 className="text-3xl font-bold">Accounts</h1>
           <p className="text-muted-foreground">Manage your bank accounts, cash, and cards</p>
         </div>
-        <Button onClick={handleAddAccount}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Account
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center border rounded-lg">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="rounded-r-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="rounded-l-none"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleAddAccount}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Account
+          </Button>
+        </div>
       </div>
 
       {/* Total Balance Summary */}
@@ -102,17 +127,26 @@ export default function AccountsPage() {
             Cash & Bank Accounts
           </h2>
           {bankAccounts.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {bankAccounts.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onEdit={handleEditAccount}
-                  onDelete={handleDeleteAccount}
-                  onSetPrimary={handleSetPrimary}
-                />
-              ))}
-            </div>
+            viewMode === 'table' ? (
+              <AccountsTableView
+                accounts={bankAccounts}
+                onEdit={handleEditAccount}
+                onDelete={handleDeleteAccount}
+                onSetPrimary={handleSetPrimary}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {bankAccounts.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    onEdit={handleEditAccount}
+                    onDelete={handleDeleteAccount}
+                    onSetPrimary={handleSetPrimary}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
               <CreditCard className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -133,17 +167,26 @@ export default function AccountsPage() {
             Credit Cards & Store Cards
           </h2>
           {creditCards.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {creditCards.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onEdit={handleEditAccount}
-                  onDelete={handleDeleteAccount}
-                  onSetPrimary={handleSetPrimary}
-                />
-              ))}
-            </div>
+            viewMode === 'table' ? (
+              <AccountsTableView
+                accounts={creditCards}
+                onEdit={handleEditAccount}
+                onDelete={handleDeleteAccount}
+                onSetPrimary={handleSetPrimary}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {creditCards.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    onEdit={handleEditAccount}
+                    onDelete={handleDeleteAccount}
+                    onSetPrimary={handleSetPrimary}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
               <p>No credit cards yet</p>
@@ -159,17 +202,26 @@ export default function AccountsPage() {
             Loans & Debts
           </h2>
           {loans.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {loans.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onEdit={handleEditAccount}
-                  onDelete={handleDeleteAccount}
-                  onSetPrimary={handleSetPrimary}
-                />
-              ))}
-            </div>
+            viewMode === 'table' ? (
+              <AccountsTableView
+                accounts={loans}
+                onEdit={handleEditAccount}
+                onDelete={handleDeleteAccount}
+                onSetPrimary={handleSetPrimary}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {loans.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    onEdit={handleEditAccount}
+                    onDelete={handleDeleteAccount}
+                    onSetPrimary={handleSetPrimary}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
               <p>No loans yet</p>
@@ -185,17 +237,26 @@ export default function AccountsPage() {
               <PiggyBank className="h-5 w-5" />
               Savings & Investments
             </h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {investments.map((account) => (
-                <AccountCard
-                  key={account.id}
-                  account={account}
-                  onEdit={handleEditAccount}
-                  onDelete={handleDeleteAccount}
-                  onSetPrimary={handleSetPrimary}
-                />
-              ))}
-            </div>
+            {viewMode === 'table' ? (
+              <AccountsTableView
+                accounts={investments}
+                onEdit={handleEditAccount}
+                onDelete={handleDeleteAccount}
+                onSetPrimary={handleSetPrimary}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {investments.map((account) => (
+                  <AccountCard
+                    key={account.id}
+                    account={account}
+                    onEdit={handleEditAccount}
+                    onDelete={handleDeleteAccount}
+                    onSetPrimary={handleSetPrimary}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

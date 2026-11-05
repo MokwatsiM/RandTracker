@@ -1,0 +1,26 @@
+name: Deploy to the server
+description: Updates the compose files and migrations, then has the server pull and start the image.
+inputs:
+  sha: { required: true, description: Commit whose image to deploy }
+  host: { required: true, description: Server address }
+  key: { required: true, description: Deploy key }
+  known-hosts: { required: true, description: Server host key }
+  token: { required: true, description: Registry token }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        HOST: ${{ inputs.host }}
+        KEY: ${{ inputs.key }}
+        KNOWN: ${{ inputs.known-hosts }}
+        TOKEN: ${{ inputs.token }}
+        SHA: ${{ inputs.sha }}
+      run: |
+        mkdir -p ~/.ssh
+        printf '%s\n' "$KNOWN" >> ~/.ssh/known_hosts
+        (umask 077; printf '%s\n' "$KEY" > ~/.ssh/deploy_key)
+        run() { ssh -i ~/.ssh/deploy_key -o BatchMode=yes "root@$HOST" "$@"; }
+        tar -czf - -C deploy docker-compose.yml gateway db -C .. supabase/migrations | run config
+        printf '%s\n%s\n' "$GITHUB_ACTOR" "$TOKEN" | run deploy "$SHA"
+        rm -f ~/.ssh/deploy_key

@@ -118,12 +118,15 @@ export default function AccountDetailsPage() {
   const isLoan = account.type === 'loan';
   const isDebt = isCreditCard || isLoan;
 
+  // For liability accounts, current_balance is stored as negative, so use absolute value
+  const currentBalance = Math.abs(account.current_balance);
+
   const creditUtilization = isCreditCard && account.credit_limit
-    ? calculatePercentage(account.current_balance, account.credit_limit)
+    ? calculatePercentage(currentBalance, account.credit_limit)
     : 0;
 
   const availableCredit = isCreditCard && account.credit_limit
-    ? account.credit_limit - account.current_balance
+    ? account.credit_limit - currentBalance
     : 0;
 
   return (
@@ -182,10 +185,11 @@ export default function AccountDetailsPage() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${isDebt ? 'text-red-600' : ''}`}>
-              {formatZAR(account.current_balance)}
+              {/* For liability accounts, show absolute value since balances are stored as negative */}
+              {formatZAR(isDebt ? Math.abs(account.current_balance) : account.current_balance)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Initial: {formatZAR(account.initial_balance)}
+              Initial: {formatZAR(isDebt ? Math.abs(account.initial_balance) : account.initial_balance)}
             </p>
           </CardContent>
         </Card>
@@ -329,7 +333,9 @@ export default function AccountDetailsPage() {
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Amount Paid</span>
                         <span className="font-medium text-green-600">
-                          {formatZAR(account.loan_principal - account.current_balance)}
+                          {/* loan_principal is positive, current_balance is negative */}
+                          {/* Amount paid = loan_principal - abs(current_balance) */}
+                          {formatZAR(account.loan_principal - Math.abs(account.current_balance))}
                         </span>
                       </div>
                     )}
@@ -338,7 +344,7 @@ export default function AccountDetailsPage() {
                         <span className="text-sm text-muted-foreground">Progress</span>
                         <span className="font-medium">
                           {calculatePercentage(
-                            account.loan_principal - account.current_balance,
+                            account.loan_principal - Math.abs(account.current_balance),
                             account.loan_principal
                           )}% paid
                         </span>
@@ -352,7 +358,7 @@ export default function AccountDetailsPage() {
                             className="h-full bg-green-500 transition-all"
                             style={{
                               width: `${calculatePercentage(
-                                account.loan_principal - account.current_balance,
+                                account.loan_principal - Math.abs(account.current_balance),
                                 account.loan_principal
                               )}%`,
                             }}

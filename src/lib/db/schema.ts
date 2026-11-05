@@ -49,12 +49,10 @@ export interface Transaction {
 
   // Recurring
   is_recurring: boolean;
-  recurrence_rule?: {
-    frequency: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
-    interval?: number;
-    end_date?: string;
-    day_of_month?: number;
-  };
+  recurrence_frequency?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly' | 'custom';
+  recurrence_interval?: number;
+  recurrence_end_date?: string;
+  recurrence_day_of_month?: number;
   is_subscription: boolean;
 
   // Transfer specific

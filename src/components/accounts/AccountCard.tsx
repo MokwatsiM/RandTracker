@@ -20,12 +20,14 @@ export function AccountCard({ account, onEdit, onDelete, onSetPrimary }: Account
   const isDebt = isCreditCard || isLoan;
 
   // Calculate credit utilization for credit cards
+  // Note: current_balance for credit cards is stored as negative, so we use absolute value
+  const currentBalance = Math.abs(account.current_balance);
   const creditUtilization = isCreditCard && account.credit_limit
-    ? calculatePercentage(account.current_balance, account.credit_limit)
+    ? calculatePercentage(currentBalance, account.credit_limit)
     : 0;
 
   const availableCredit = isCreditCard && account.credit_limit
-    ? account.credit_limit - account.current_balance
+    ? account.credit_limit - currentBalance
     : 0;
 
   const handleCardClick = (e: React.MouseEvent) => {
@@ -74,7 +76,8 @@ export function AccountCard({ account, onEdit, onDelete, onSetPrimary }: Account
               {isCreditCard ? 'Current Balance' : isLoan ? 'Outstanding' : 'Balance'}
             </p>
             <p className={`text-2xl font-bold ${isDebt ? 'text-red-600' : ''}`}>
-              {formatZAR(account.current_balance)}
+              {/* For liability accounts, show absolute value since balances are stored as negative */}
+              {formatZAR(isDebt ? Math.abs(account.current_balance) : account.current_balance)}
             </p>
           </div>
 
@@ -154,8 +157,10 @@ export function AccountCard({ account, onEdit, onDelete, onSetPrimary }: Account
                   <div className="flex justify-between text-xs mb-1">
                     <span className="text-muted-foreground">Progress</span>
                     <span>
+                      {/* loan_principal stored as positive, current_balance as negative */}
+                      {/* So amount paid = loan_principal - abs(current_balance) */}
                       {calculatePercentage(
-                        account.loan_principal - account.current_balance,
+                        account.loan_principal - Math.abs(account.current_balance),
                         account.loan_principal
                       )}
                       % paid
@@ -166,7 +171,7 @@ export function AccountCard({ account, onEdit, onDelete, onSetPrimary }: Account
                       className="h-full bg-green-500 transition-all"
                       style={{
                         width: `${calculatePercentage(
-                          account.loan_principal - account.current_balance,
+                          account.loan_principal - Math.abs(account.current_balance),
                           account.loan_principal
                         )}%`,
                       }}

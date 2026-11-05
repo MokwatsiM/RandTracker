@@ -1,0 +1,44 @@
+# Pushing to dev builds the image, then the server pulls it, applies any new
+# migrations and restarts the app. The server never builds anything.
+name: Deploy
+on:
+  push:
+    branches: [dev]
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency: deploy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set the image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}-app:${GITHUB_SHA}" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.SUPABASE_ANON_KEY }}
+      - uses: ./.github/actions/deploy
+        with:
+          sha: ${{ github.sha }}
+          host: ${{ secrets.VPS_HOST }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          known-hosts: ${{ secrets.VPS_KNOWN_HOSTS }}
+          token: ${{ secrets.GITHUB_TOKEN }}

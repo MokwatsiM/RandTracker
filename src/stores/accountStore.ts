@@ -1,13 +1,13 @@
-import { create } from 'zustand';
 import type { Account } from '@/lib/db/schema';
 import {
-  archiveAccountRecord,
-  createAccountRecord,
-  fetchAccounts,
-  refreshAllAccountBalances,
-  setPrimaryAccountRecord,
-  updateAccountRecord,
+    archiveAccountRecord,
+    createAccountRecord,
+    fetchAccounts,
+    refreshAllAccountBalances,
+    setPrimaryAccountRecord,
+    updateAccountRecord,
 } from '@/lib/supabase/data';
+import { create } from 'zustand';
 
 interface AccountStore {
   accounts: Account[];
@@ -99,7 +99,7 @@ export const useAccountStore = create<AccountStore>((set, get) => ({
         return total - account.current_balance;
       }
 
-      return total + account.current_balance;
+      return total  -account.current_balance   ;
     }, 0),
 
   refreshBalances: async () => {

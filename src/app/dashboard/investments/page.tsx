@@ -3,14 +3,17 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, TrendingUp, PiggyBank, Building2, Landmark } from 'lucide-react';
+import { Plus, TrendingUp, PiggyBank, Building2, Landmark, LayoutGrid, List } from 'lucide-react';
 import { useInvestmentStore, type Investment, type InvestmentTransaction } from '@/stores/investmentStore';
 import { useUserStore } from '@/stores/userStore';
 import { InvestmentDialog } from '@/components/investments/InvestmentDialog';
 import { InvestmentCard } from '@/components/investments/InvestmentCard';
+import { InvestmentsTableView } from '@/components/investments/InvestmentsTableView';
 import { InvestmentTransactionDialog } from '@/components/investments/InvestmentTransactionDialog';
 import { InvestmentTransactionList } from '@/components/investments/InvestmentTransactionList';
 import { formatZAR } from '@/lib/currency';
+
+type ViewMode = 'cards' | 'table';
 
 export default function InvestmentsPage() {
   const user = useUserStore(state => state.user);
@@ -31,6 +34,7 @@ export default function InvestmentsPage() {
   const [transactionInvestment, setTransactionInvestment] = useState<Investment | undefined>();
 
   const [viewingInvestment, setViewingInvestment] = useState<Investment | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
 
   useEffect(() => {
     if (user) {
@@ -205,10 +209,31 @@ export default function InvestmentsPage() {
           <h1 className="text-3xl font-bold">Investments</h1>
           <p className="text-muted-foreground">Track your TFSA, stocks, ETFs, and other investments</p>
         </div>
-        <Button onClick={handleAddInvestment}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Investment
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center border rounded-lg">
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('table')}
+              className="rounded-r-none"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'cards' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setViewMode('cards')}
+              className="rounded-l-none"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+          <Button onClick={handleAddInvestment}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Investment
+          </Button>
+        </div>
       </div>
 
       {/* Portfolio Summary */}
@@ -261,17 +286,26 @@ export default function InvestmentsPage() {
             TFSA Investments
           </h2>
           {tfsaInvestments.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {tfsaInvestments.map((investment) => (
-                <InvestmentCard
-                  key={investment.id}
-                  investment={investment}
-                  onEdit={handleEditInvestment}
-                  onDelete={handleDeleteInvestment}
-                  onClick={handleViewInvestment}
-                />
-              ))}
-            </div>
+            viewMode === 'table' ? (
+              <InvestmentsTableView
+                investments={tfsaInvestments}
+                onEdit={handleEditInvestment}
+                onDelete={handleDeleteInvestment}
+                onClick={handleViewInvestment}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {tfsaInvestments.map((investment) => (
+                  <InvestmentCard
+                    key={investment.id}
+                    investment={investment}
+                    onEdit={handleEditInvestment}
+                    onDelete={handleDeleteInvestment}
+                    onClick={handleViewInvestment}
+                  />
+                ))}
+              </div>
+            )
           ) : (
             <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-lg">
               <PiggyBank className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -288,17 +322,26 @@ export default function InvestmentsPage() {
               <Landmark className="h-5 w-5 text-blue-600" />
               Fixed Deposits
             </h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {fixedDeposits.map((investment) => (
-                <InvestmentCard
-                  key={investment.id}
-                  investment={investment}
-                  onEdit={handleEditInvestment}
-                  onDelete={handleDeleteInvestment}
-                  onClick={handleViewInvestment}
-                />
-              ))}
-            </div>
+            {viewMode === 'table' ? (
+              <InvestmentsTableView
+                investments={fixedDeposits}
+                onEdit={handleEditInvestment}
+                onDelete={handleDeleteInvestment}
+                onClick={handleViewInvestment}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {fixedDeposits.map((investment) => (
+                  <InvestmentCard
+                    key={investment.id}
+                    investment={investment}
+                    onEdit={handleEditInvestment}
+                    onDelete={handleDeleteInvestment}
+                    onClick={handleViewInvestment}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -309,17 +352,26 @@ export default function InvestmentsPage() {
               <TrendingUp className="h-5 w-5 text-purple-600" />
               Stocks, ETFs & Unit Trusts
             </h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {stocksAndEtfs.map((investment) => (
-                <InvestmentCard
-                  key={investment.id}
-                  investment={investment}
-                  onEdit={handleEditInvestment}
-                  onDelete={handleDeleteInvestment}
-                  onClick={handleViewInvestment}
-                />
-              ))}
-            </div>
+            {viewMode === 'table' ? (
+              <InvestmentsTableView
+                investments={stocksAndEtfs}
+                onEdit={handleEditInvestment}
+                onDelete={handleDeleteInvestment}
+                onClick={handleViewInvestment}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {stocksAndEtfs.map((investment) => (
+                  <InvestmentCard
+                    key={investment.id}
+                    investment={investment}
+                    onEdit={handleEditInvestment}
+                    onDelete={handleDeleteInvestment}
+                    onClick={handleViewInvestment}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -330,17 +382,26 @@ export default function InvestmentsPage() {
               <Building2 className="h-5 w-5" />
               Other Investments
             </h2>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {otherInvestments.map((investment) => (
-                <InvestmentCard
-                  key={investment.id}
-                  investment={investment}
-                  onEdit={handleEditInvestment}
-                  onDelete={handleDeleteInvestment}
-                  onClick={handleViewInvestment}
-                />
-              ))}
-            </div>
+            {viewMode === 'table' ? (
+              <InvestmentsTableView
+                investments={otherInvestments}
+                onEdit={handleEditInvestment}
+                onDelete={handleDeleteInvestment}
+                onClick={handleViewInvestment}
+              />
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {otherInvestments.map((investment) => (
+                  <InvestmentCard
+                    key={investment.id}
+                    investment={investment}
+                    onEdit={handleEditInvestment}
+                    onDelete={handleDeleteInvestment}
+                    onClick={handleViewInvestment}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
 

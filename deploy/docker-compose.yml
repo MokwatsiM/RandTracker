@@ -1,0 +1,187 @@
+# RandTracker on a server shared with Coolify and the LGE stack. A cut-down Supabase:
+# the app uses only Auth and the REST API, so Storage, Realtime, Functions, Analytics
+# and the pooler are left out to save memory. Nothing is reachable from the internet
+# except through the Cloudflare Tunnel; the two published ports are loopback only.
+name: randtracker
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
+services:
+  db:
+    <<: *logging
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    mem_limit: 768m
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - db-config:/etc/postgresql-custom
+      - ./db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:ro
+      - ./db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:ro
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      PGDATABASE: postgres
+      POSTGRES_DB: postgres
+      JWT_EXP: 3600
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf", "-c", "max_connections=50", "-c", "log_min_messages=fatal"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  auth:
+    <<: *logging
+    image: supabase/gotrue:v2.197.0
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: ${API_URL:?}
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/postgres
+      GOTRUE_SITE_URL: ${SITE_URL:?}
+      GOTRUE_URI_ALLOW_LIST: ${SITE_URL}/**
+      GOTRUE_DISABLE_SIGNUP: ${DISABLE_SIGNUP:-false}
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: ${JWT_SECRET:?}
+      GOTRUE_JWT_ISSUER: ${API_URL}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_PASSWORD_MIN_LENGTH: 8
+      # Only cloudflared can reach this stack, so this header can be trusted.
+      GOTRUE_RATE_LIMIT_HEADER: CF-Connecting-IP
+      # true until SMTP is configured. See "Email" in README.md.
+      GOTRUE_MAILER_AUTOCONFIRM: ${ENABLE_EMAIL_AUTOCONFIRM:-true}
+      GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL:-noreply@mokwatsi.tech}
+      GOTRUE_SMTP_HOST: ${SMTP_HOST:-}
+      GOTRUE_SMTP_PORT: ${SMTP_PORT:-587}
+      GOTRUE_SMTP_USER: ${SMTP_USER:-}
+      GOTRUE_SMTP_PASS: ${SMTP_PASS:-}
+      GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME:-RandTracker}
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9999/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  rest:
+    <<: *logging
+    image: postgrest/postgrest:v14.18
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/postgres
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_MAX_ROWS: 1000
+      PGRST_DB_EXTRA_SEARCH_PATH: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${JWT_SECRET}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_EXP: 3600
+    command: ["postgrest"]
+
+  gateway:
+    <<: *logging
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    mem_limit: 64m
+    depends_on: [auth, rest]
+    volumes:
+      - ./gateway/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    environment:
+      SITE_URL: ${SITE_URL}
+      ANON_KEY: ${ANON_KEY:?}
+      SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY:?}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  app:
+    <<: *logging
+    # Set by randtracker-deploy in images.env.
+    image: ${APP_IMAGE:-randtracker-app:unset}
+    restart: unless-stopped
+    mem_limit: 512m
+    depends_on: [gateway]
+    ports:
+      - "127.0.0.1:13200:3000"
+
+  cloudflared:
+    <<: *logging
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    mem_limit: 128m
+    profiles: [tunnel]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+
+  # Admin dashboard, off by default. See "Database admin" in README.md.
+  meta:
+    <<: *logging
+    image: supabase/postgres-meta:v0.100.0
+    profiles: [admin]
+    mem_limit: 128m
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      PG_META_PORT: 8080
+      PG_META_DB_HOST: db
+      PG_META_DB_PORT: 5432
+      PG_META_DB_NAME: postgres
+      PG_META_DB_USER: postgres
+      PG_META_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      CRYPTO_KEY: ${PG_META_CRYPTO_KEY:?}
+
+  studio:
+    <<: *logging
+    image: supabase/studio:2026.11.02-sha-a05e7ec
+    profiles: [admin]
+    mem_limit: 768m
+    depends_on: [meta]
+    ports:
+      - "127.0.0.1:13210:3000"
+    environment:
+      HOSTNAME: 0.0.0.0
+      STUDIO_PG_META_URL: http://meta:8080
+      POSTGRES_PORT: 5432
+      POSTGRES_HOST: db
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER_READ_WRITE: postgres
+      PG_META_CRYPTO_KEY: ${PG_META_CRYPTO_KEY}
+      PGRST_DB_SCHEMAS: public
+      DEFAULT_ORGANIZATION_NAME: RandTracker
+      DEFAULT_PROJECT_NAME: RandTracker
+      SUPABASE_URL: http://gateway:8000
+      SUPABASE_PUBLIC_URL: ${API_URL}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      SUPABASE_SERVICE_KEY: ${SERVICE_ROLE_KEY}
+      AUTH_JWT_SECRET: ${JWT_SECRET}
+      ENABLED_FEATURES_LOGS_ALL: "false"
+
+volumes:
+  db-data:
+  db-config:

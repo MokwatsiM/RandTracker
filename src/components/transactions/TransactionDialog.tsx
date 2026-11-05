@@ -41,8 +41,8 @@ const getInitialFormData = (transaction?: Transaction) => ({
   debt_id: transaction?.debt_id || '',
   principal_portion: transaction?.principal_portion ? (transaction.principal_portion / 100).toString() : '',
   is_recurring: transaction?.is_recurring || false,
-  recurrence_frequency: transaction?.recurrence_rule?.frequency || 'monthly',
-  recurrence_end_date: transaction?.recurrence_rule?.end_date || '',
+  recurrence_frequency: transaction?.recurrence_frequency || 'monthly',
+  recurrence_end_date: transaction?.recurrence_end_date || '',
 });
 
 export function TransactionDialog({ open, onOpenChange, transaction }: TransactionDialogProps) {
@@ -119,10 +119,8 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
       // Add recurrence rule if recurring
       if (formData.is_recurring) {
-        transactionData.recurrence_rule = {
-          frequency: formData.recurrence_frequency,
-          end_date: formData.recurrence_end_date || undefined,
-        };
+        transactionData.recurrence_frequency = formData.recurrence_frequency;
+        transactionData.recurrence_end_date = formData.recurrence_end_date || undefined;
       }
 
       if (transaction) {

@@ -46,26 +46,39 @@ const ACCOUNT_COLORS = [
   '#06b6d4', // Cyan
 ];
 
-const getInitialFormData = (account?: Account) => ({
-  name: account?.name || '',
-  type: account?.type || 'cheque' as Account['type'],
-  initial_balance: account?.initial_balance ? (account.initial_balance / 100).toString() : '0',
-  icon: account?.icon || '💳',
-  color: account?.color || '#6366f1',
-  group_name: account?.group_name || '',
+const getInitialFormData = (account?: Account) => {
+  // For liability accounts, display balances as positive numbers even though they're stored as negative
+  let displayBalance = '0';
+  if (account?.initial_balance) {
+    // If it's a liability account (credit card, loan, store card), show absolute value
+    if (account.type === 'credit_card' || account.type === 'loan' || account.type === 'store_card') {
+      displayBalance = (Math.abs(account.initial_balance) / 100).toString();
+    } else {
+      displayBalance = (account.initial_balance / 100).toString();
+    }
+  }
 
-  // Credit card fields
-  credit_limit: account?.credit_limit ? (account.credit_limit / 100).toString() : '',
-  statement_day: account?.statement_day?.toString() || '',
-  payment_due_day: account?.payment_due_day?.toString() || '',
-  interest_rate: account?.interest_rate?.toString() || '',
+  return {
+    name: account?.name || '',
+    type: account?.type || 'cheque' as Account['type'],
+    initial_balance: displayBalance,
+    icon: account?.icon || '💳',
+    color: account?.color || '#6366f1',
+    group_name: account?.group_name || '',
 
-  // Loan fields
-  loan_principal: account?.loan_principal ? (account.loan_principal / 100).toString() : '',
-  loan_interest_rate: account?.loan_interest_rate?.toString() || '',
-  loan_term_months: account?.loan_term_months?.toString() || '',
-  monthly_instalment: account?.monthly_instalment ? (account.monthly_instalment / 100).toString() : '',
-});
+    // Credit card fields
+    credit_limit: account?.credit_limit ? (account.credit_limit / 100).toString() : '',
+    statement_day: account?.statement_day?.toString() || '',
+    payment_due_day: account?.payment_due_day?.toString() || '',
+    interest_rate: account?.interest_rate?.toString() || '',
+
+    // Loan fields
+    loan_principal: account?.loan_principal ? (account.loan_principal / 100).toString() : '',
+    loan_interest_rate: account?.loan_interest_rate?.toString() || '',
+    loan_term_months: account?.loan_term_months?.toString() || '',
+    monthly_instalment: account?.monthly_instalment ? (account.monthly_instalment / 100).toString() : '',
+  };
+};
 
 export function AccountDialog({ open, onOpenChange, account }: AccountDialogProps) {
   const user = useUserStore(state => state.user);
@@ -86,7 +99,15 @@ export function AccountDialog({ open, onOpenChange, account }: AccountDialogProp
     setIsSubmitting(true);
 
     try {
-      const balanceInCents = Math.round(parseFloat(formData.initial_balance || '0') * 100);
+      let balanceInCents = Math.round(parseFloat(formData.initial_balance || '0') * 100);
+
+      // For liability accounts (credit cards, loans, store cards), store balances as negative
+      // This ensures proper accounting: paying off debt reduces the negative balance
+      if (formData.type === 'credit_card' || formData.type === 'loan' || formData.type === 'store_card') {
+        // User enters the outstanding amount as a positive number (e.g., 900000)
+        // We store it as negative (e.g., -900000) because it's money you owe
+        balanceInCents = -Math.abs(balanceInCents);
+      }
 
       const baseData = {
         user_id: user.id,
@@ -198,6 +219,11 @@ export function AccountDialog({ open, onOpenChange, account }: AccountDialogProp
               placeholder="0.00"
               required
             />
+            {(formData.type === 'credit_card' || formData.type === 'loan' || formData.type === 'store_card') && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter the amount you owe (e.g., R900,000 for a home loan). The app will track this as a liability.
+              </p>
+            )}
           </div>
 
           {/* Credit Card Fields */}

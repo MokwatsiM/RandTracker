@@ -1,0 +1,12 @@
+.git
+.github
+.next
+.vercel
+.claude
+node_modules
+deploy
+scripts
+supabase
+*.md
+.env*
+*.tsbuildinfo

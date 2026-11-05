@@ -5,13 +5,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Plus, Search, Filter, X, ArrowUpDown } from 'lucide-react';
+import { Plus, Search, Filter, X, ArrowUpDown, Upload } from 'lucide-react';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useAccountStore } from '@/stores/accountStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useUserStore } from '@/stores/userStore';
 import { TransactionRow } from '@/components/transactions/TransactionRow';
 import { TransactionDialog } from '@/components/transactions/TransactionDialog';
+import { RecurringTransactionProcessor } from '@/components/transactions/RecurringTransactionProcessor';
+import { StatementUploadDialog } from '@/components/statements/StatementUploadDialog';
 import { formatZAR } from '@/lib/currency';
 import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns';
 import type { Transaction } from '@/lib/db/schema';
@@ -33,6 +35,7 @@ export default function TransactionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | undefined>();
   const [showFilters, setShowFilters] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -54,6 +57,20 @@ export default function TransactionsPage() {
       initializeDefaultCategories(user.id);
     }
   }, [user, loadTransactions, loadAccounts, loadCategories, initializeDefaultCategories]);
+
+  // Listen for recurring transactions processed event
+  useEffect(() => {
+    const handleRecurringProcessed = () => {
+      if (user) {
+        loadTransactions(user.id);
+      }
+    };
+
+    window.addEventListener('recurring-transactions-processed', handleRecurringProcessed);
+    return () => {
+      window.removeEventListener('recurring-transactions-processed', handleRecurringProcessed);
+    };
+  }, [user, loadTransactions]);
 
   // Filter and sort transactions
   const filteredAndSortedTransactions = useMemo(() => {
@@ -183,11 +200,20 @@ export default function TransactionsPage() {
           <h1 className="text-3xl font-bold">Transactions</h1>
           <p className="text-muted-foreground">Track all your income and expenses</p>
         </div>
-        <Button onClick={handleAddTransaction}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Transaction
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Import Statement
+          </Button>
+          <Button onClick={handleAddTransaction}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        </div>
       </div>
+
+      {/* Recurring Transaction Processor */}
+      <RecurringTransactionProcessor />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
@@ -384,6 +410,12 @@ export default function TransactionsPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         transaction={selectedTransaction}
+      />
+
+      {/* Statement Upload Dialog */}
+      <StatementUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
       />
     </div>
   );

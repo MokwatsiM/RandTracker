@@ -92,3 +92,48 @@ npm start
 
 - See [QUICKSTART.md](./QUICKSTART.md) for a shorter setup flow.
 - See [RandTracker-Project-Plan.md](./RandTracker-Project-Plan.md) for the broader roadmap.
+
+## Self-hosted deployment
+
+Runs at https://randtracker.mokwatsi.tech on the Hostinger VPS, in `/opt/randtracker/deploy` beside Coolify and the LGE stack. It's a plain Docker Compose project, so it doesn't appear in Coolify's dashboard. No ports are public: a Cloudflare Tunnel sends `randtracker.mokwatsi.tech` to `app:3000` and `randtracker-api.mokwatsi.tech` to `gateway:8000`, and the routes live in the tunnel's config in Cloudflare.
+
+Supabase is cut down to Postgres, Auth, PostgREST and an nginx gateway, because the server has 1 vCPU and 3.8 GB of RAM. The app doesn't use Storage, Realtime or Functions.
+
+Pushing to `dev` builds an image in GitHub Actions. The server pulls it, applies any new files in `supabase/migrations`, restarts the app and goes back to the previous image if the health check fails. Changes to other services in the compose file need a manual `up -d` on the server.
+
+First-time setup, which is safe to re-run:
+
+```bash
+scripts/setup-server.sh root@your-server
+```
+
+```bash
+scripts/install-deploy-key.sh root@your-server
+```
+
+Secrets are in `/opt/randtracker/deploy/.env` on the server and never in git. Compose commands there need `--env-file .env --env-file images.env -f docker-compose.yml`. Backups are manual:
+
+```bash
+scripts/backup-from-vps.sh root@your-server
+```
+
+### Email
+
+No SMTP is configured yet, so new accounts are confirmed automatically and password reset emails can't be sent. To turn email on, add these to `.env` on the server, then run `up -d auth`:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your-user
+SMTP_PASS=your-password
+SMTP_ADMIN_EMAIL=noreply@mokwatsi.tech
+ENABLE_EMAIL_AUTOCONFIRM=false
+```
+
+### Database admin
+
+Supabase Studio is off by default to save memory. Start it on the server with `--profile admin up -d studio`, then open a tunnel and go to http://localhost:13210. Stop it afterwards with `--profile admin stop studio meta`.
+
+```bash
+ssh -N -L 13210:localhost:13210 root@your-server
+```
