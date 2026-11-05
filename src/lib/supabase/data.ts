@@ -293,19 +293,27 @@ export async function ensureUserProfile(authUser: User): Promise<UserProfile> {
         ? authUser.user_metadata.name
         : authUser.email ?? 'RandTracker User';
 
+  // Runs on every sign-in, so the defaults only apply to a profile that doesn't exist yet.
+  // Updating here would reset the user's payday, currency and name each time.
+  const { error: insertError } = await supabase.from('user_profiles').upsert(
+    {
+      id: authUser.id,
+      email: authUser.email ?? '',
+      full_name: fullName,
+      currency: 'ZAR',
+      payday_date: 25,
+    },
+    { onConflict: 'id', ignoreDuplicates: true }
+  );
+
+  if (insertError) {
+    throw insertError;
+  }
+
   const { data, error } = await supabase
     .from('user_profiles')
-    .upsert(
-      {
-        id: authUser.id,
-        email: authUser.email ?? '',
-        full_name: fullName,
-        currency: 'ZAR',
-        payday_date: 25,
-      },
-      { onConflict: 'id' }
-    )
     .select('*')
+    .eq('id', authUser.id)
     .single<RemoteUserProfile>();
 
   if (error) {
