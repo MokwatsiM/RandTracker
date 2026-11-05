@@ -21,6 +21,7 @@ type RemoteUserProfile = {
   currency: string | null;
   payday_date: number | null;
   rule_learning: boolean | null;
+  saved_filters: UserProfile['saved_filters'] | null;
   created_at: string;
 };
 
@@ -72,6 +73,9 @@ type RemoteTransaction = {
   imported_id: string | null;
   schedule_id: string | null;
   schedule_date: string | null;
+  splits: Transaction['splits'];
+  cleared: boolean | null;
+  reconciled: boolean | null;
   is_paid: boolean;
   exclude_from_budget: boolean;
   is_deleted: boolean;
@@ -145,6 +149,7 @@ function mapUserProfile(profile: RemoteUserProfile): UserProfile {
     payday_date: profile.payday_date ?? 25,
     theme: 'system',
     rule_learning: profile.rule_learning ?? true,
+    saved_filters: profile.saved_filters ?? [],
     created_at: profile.created_at,
   };
 }
@@ -206,6 +211,9 @@ function mapTransaction(transaction: RemoteTransaction): Transaction {
     imported_id: transaction.imported_id ?? undefined,
     schedule_id: transaction.schedule_id ?? undefined,
     schedule_date: transaction.schedule_date ?? undefined,
+    splits: transaction.splits ?? null,
+    cleared: transaction.cleared ?? false,
+    reconciled: transaction.reconciled ?? false,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     created_at: transaction.created_at,
@@ -284,6 +292,9 @@ function toRemoteTransaction(transaction: Transaction) {
     imported_id: transaction.imported_id ?? null,
     schedule_id: transaction.schedule_id ?? null,
     schedule_date: transaction.schedule_date ?? null,
+    splits: transaction.splits && transaction.splits.length > 0 ? transaction.splits : null,
+    cleared: transaction.cleared ?? false,
+    reconciled: transaction.reconciled ?? false,
     is_paid: transaction.is_paid,
     exclude_from_budget: transaction.exclude_from_budget,
     is_deleted: transaction.is_deleted,
@@ -341,6 +352,7 @@ export async function updateUserProfile(profileId: string, updates: Partial<User
       currency: updates.currency,
       payday_date: updates.payday_date,
       rule_learning: updates.rule_learning,
+      saved_filters: updates.saved_filters,
     })
     .eq('id', profileId)
     .select('*')
@@ -717,6 +729,34 @@ export async function saveAllocations(userId: string, cycleStart: string, amount
   if (error) {
     throw error;
   }
+}
+
+/** Undoes a delete. */
+export async function restoreTransactionRecord(id: string): Promise<Transaction> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from('transactions')
+    .update({ is_deleted: false, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select('*')
+    .single<RemoteTransaction>();
+  if (error) {
+    throw error;
+  }
+  return mapTransaction(data);
+}
+
+/** Locks in cleared transactions once they match the statement; returns how many. */
+export async function reconcileAccount(accountId: string, statementBalance: number): Promise<number> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('reconcile_account', {
+    p_account_id: accountId,
+    p_statement_balance: statementBalance,
+  });
+  if (error) {
+    throw error;
+  }
+  return data as number;
 }
 
 export async function fetchSchedules(userId: string): Promise<Schedule[]> {

@@ -24,6 +24,9 @@ import {
 import { formatZAR, calculatePercentage } from '@/lib/currency';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import type { Transaction } from '@/lib/db/schema';
+import { ReconcilePanel } from '@/components/accounts/ReconcilePanel';
+import { runningBalances } from '@/lib/ledger/ledger';
+import { CheckCircle2, Lock } from 'lucide-react';
 
 export default function AccountDetailsPage() {
   const params = useParams();
@@ -49,6 +52,12 @@ export default function AccountDetailsPage() {
   const account = useMemo(() => {
     return accounts.find((acc) => acc.id === accountId);
   }, [accounts, accountId]);
+
+  // Balance after each transaction, worked out over the full history.
+  const balances = useMemo(
+    () => (account ? runningBalances(account, transactions) : new Map<string, number>()),
+    [account, transactions]
+  );
 
   // Filter transactions for this account
   const accountTransactions = useMemo(() => {
@@ -402,6 +411,11 @@ export default function AccountDetailsPage() {
         </Card>
       )}
 
+      <ReconcilePanel
+        account={account}
+        transactions={transactions.filter((t) => t.account_id === accountId || t.transfer_account_id === accountId)}
+      />
+
       {/* Transactions Section */}
       <Card>
         <CardHeader>
@@ -458,6 +472,12 @@ export default function AccountDetailsPage() {
                         {transaction.type === 'income' || isTransferIn ? '+' : '-'}
                         {formatZAR(transaction.amount)}
                       </p>
+                      {balances.has(transaction.id) && (
+                        <p className="flex items-center justify-end gap-1 text-xs text-muted-foreground">
+                          {transaction.reconciled ? <Lock className="h-3 w-3" aria-label="Reconciled" /> : transaction.cleared ? <CheckCircle2 className="h-3 w-3 text-green-600" aria-label="Cleared" /> : null}
+                          Balance {formatZAR(balances.get(transaction.id)!)}
+                        </p>
+                      )}
                       <p className="text-xs text-muted-foreground capitalize">
                         {transaction.type === 'transfer'
                           ? (isTransferOut ? 'Transfer Out' : 'Transfer In')

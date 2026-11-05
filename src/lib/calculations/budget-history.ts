@@ -5,7 +5,7 @@
 
 import { startOfMonth, endOfMonth, subMonths, format, parseISO, isWithinInterval } from 'date-fns';
 import type { Budget, Transaction } from '@/lib/db/schema';
-import { shouldIncludeInBudget } from './budget';
+import { shouldIncludeInBudget, budgetAmount } from './budget';
 
 export interface BudgetPeriodSelection {
   start: Date;
@@ -80,7 +80,7 @@ export function calculateBudgetPerformance(
     return isInPeriod && shouldIncludeInBudget(transaction, budget);
   });
 
-  const spent = relevantTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+  const spent = relevantTransactions.reduce((sum, transaction) => sum + budgetAmount(transaction, budget), 0);
   const remaining = budget.amount - spent;
   const percentageUsed = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
 

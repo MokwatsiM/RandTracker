@@ -1,6 +1,6 @@
 'use client';
 
-import { Edit, Trash2, ArrowUpRight, ArrowDownRight, Repeat, Clock } from 'lucide-react';
+import { Edit, Trash2, ArrowUpRight, ArrowDownRight, Repeat, Clock, CheckCircle2, Lock, Split } from 'lucide-react';
 import { formatZAR } from '@/lib/currency';
 import { format, isFuture, parseISO } from 'date-fns';
 import type { Transaction, Category, Account } from '@/lib/db/schema';
@@ -12,6 +12,13 @@ interface TransactionRowProps {
   toAccount?: Account;
   onEdit: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
+  subcategoryName?: string;
+  /** Category names for the parts of a split transaction. */
+  splitNames?: string[];
+  /** Running balance after this transaction, shown on an account's page. */
+  balance?: number;
+  selected?: boolean;
+  onSelect?: (selected: boolean) => void;
 }
 
 export function TransactionRow({
@@ -20,8 +27,14 @@ export function TransactionRow({
   account,
   toAccount,
   onEdit,
-  onDelete
+  onDelete,
+  subcategoryName,
+  splitNames,
+  balance,
+  selected,
+  onSelect,
 }: TransactionRowProps) {
+  const isSplit = Boolean(transaction.splits?.length);
   const isIncome = transaction.type === 'income';
   const isTransfer = transaction.type === 'transfer';
   const isFutureTransaction = isFuture(parseISO(transaction.date));
@@ -29,7 +42,16 @@ export function TransactionRow({
   return (
     <div className="flex items-center justify-between py-3 px-4 hover:bg-accent/50 rounded-lg transition-colors border-b last:border-0">
       {/* Left: Icon + Details */}
-      <div className="flex items-center gap-3 flex-1">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {onSelect && (
+          <input
+            type="checkbox"
+            className="h-4 w-4 flex-shrink-0"
+            checked={!!selected}
+            onChange={(e) => onSelect(e.target.checked)}
+            aria-label={`Select ${transaction.title}`}
+          />
+        )}
         <div
           className={`w-10 h-10 rounded-full flex items-center justify-center ${
             isIncome
@@ -53,14 +75,22 @@ export function TransactionRow({
             <p className="font-medium truncate">
               {isTransfer
                 ? `Transfer to ${toAccount?.name || 'Unknown Account'}`
+                : isSplit
+                ? `Split: ${(splitNames ?? []).join(', ')}`
                 : `${category?.icon || ''} ${category?.name || 'Uncategorized'}`
               }
             </p>
-            {transaction.subcategory_id && (
+            {isSplit && <Split className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-label="Split" />}
+            {!isSplit && subcategoryName && (
               <span className="text-xs text-muted-foreground">
-                • {transaction.subcategory_id}
+                • {subcategoryName}
               </span>
             )}
+            {transaction.reconciled ? (
+              <Lock className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-label="Reconciled" />
+            ) : transaction.cleared ? (
+              <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0 text-green-600" aria-label="Cleared" />
+            ) : null}
             {transaction.is_recurring && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 text-xs rounded-full">
                 <Repeat className="h-3 w-3" />
@@ -93,6 +123,13 @@ export function TransactionRow({
               </>
             )}
           </div>
+          {transaction.tags && transaction.tags.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {transaction.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">#{tag}</span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -108,6 +145,7 @@ export function TransactionRow({
           }`}>
             {isIncome ? '+' : isTransfer ? '' : '-'}{formatZAR(transaction.amount)}
           </p>
+          {balance !== undefined && <p className="text-xs text-muted-foreground">{formatZAR(balance)}</p>}
         </div>
 
         {/* Actions */}

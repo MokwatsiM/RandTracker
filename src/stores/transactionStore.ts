@@ -8,6 +8,7 @@ import {
   fetchTransactions,
   fetchTransactionsByDateRange,
   softDeleteTransactionRecord,
+  restoreTransactionRecord,
   updateTransactionRecord,
 } from '@/lib/supabase/data';
 import { useAccountStore } from '@/stores/accountStore';
@@ -48,6 +49,10 @@ interface TransactionStore {
   updateTransactions: (transactions: Transaction[]) => Promise<void>;
   updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
+  /** Deletes several in one request. */
+  deleteTransactions: (transactions: Transaction[]) => Promise<void>;
+  /** Undoes a delete. */
+  restoreTransactions: (transactions: Transaction[]) => Promise<void>;
   getTransactionById: (id: string) => Transaction | undefined;
   getTransactionsByAccount: (accountId: string) => Transaction[];
   getTransactionsByCategory: (categoryId: string) => Transaction[];
@@ -154,6 +159,35 @@ export const useTransactionStore = create<TransactionStore>((set, get) => ({
       await reloadBalances(deletedTransaction.user_id);
       set((state) => ({
         transactions: state.transactions.filter((transaction) => transaction.id !== id),
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+      throw error;
+    }
+  },
+
+  deleteTransactions: async (list) => {
+    if (list.length === 0) return;
+    try {
+      await updateTransactionRecords(list.map((t) => ({ ...t, is_deleted: true })));
+      const ids = new Set(list.map((t) => t.id));
+      await reloadBalances(list[0].user_id);
+      set((state) => ({ transactions: state.transactions.filter((t) => !ids.has(t.id)) }));
+    } catch (error) {
+      set({ error: (error as Error).message });
+      throw error;
+    }
+  },
+
+  restoreTransactions: async (list) => {
+    if (list.length === 0) return;
+    try {
+      const restored = list.length === 1
+        ? [await restoreTransactionRecord(list[0].id)]
+        : await updateTransactionRecords(list.map((t) => ({ ...t, is_deleted: false })));
+      await reloadBalances(list[0].user_id);
+      set((state) => ({
+        transactions: [...restored, ...state.transactions].sort((a, b) => b.date.localeCompare(a.date)),
       }));
     } catch (error) {
       set({ error: (error as Error).message });

@@ -29,6 +29,8 @@ export interface Account {
 
   is_archived: boolean;
   sort_order: number;
+  last_reconciled_at?: string | null;
+  last_reconciled_balance?: number | null;
   /** Remembered import settings, such as the CSV column mapping. */
   import_settings?: { csv?: import('@/lib/import/csv').CsvMapping } | null;
   created_at: string;
@@ -77,6 +79,12 @@ export interface Transaction {
   /** The schedule occurrence this transaction is, if any. */
   schedule_id?: string;
   schedule_date?: string;
+  /** Parts of a split transaction; their amounts add up to `amount`. */
+  splits?: import('@/lib/ledger/ledger').SplitPart[] | null;
+  /** The bank has shown it. */
+  cleared?: boolean;
+  /** Locked in by reconciling the account against a statement. */
+  reconciled?: boolean;
   is_paid: boolean;
   exclude_from_budget: boolean;
 
@@ -172,5 +180,7 @@ export interface UserProfile {
   theme: 'light' | 'dark' | 'system';
   /** Whether categorising a transaction teaches a rule for its payee. */
   rule_learning: boolean;
+  /** Named transaction filters. */
+  saved_filters?: { name: string; filter: import('@/lib/ledger/ledger').TransactionFilter }[];
   created_at: string;
 }

@@ -9,7 +9,7 @@ import { useBudgetStore } from '@/stores/budgetStore';
 import { useCategoryStore } from '@/stores/categoryStore';
 import { useTransactionStore } from '@/stores/transactionStore';
 import { useUserStore } from '@/stores/userStore';
-import { shouldIncludeInBudget, getCurrentBudgetPeriod } from '@/lib/calculations/budget';
+import { shouldIncludeInBudget, getCurrentBudgetPeriod, budgetAmount } from '@/lib/calculations/budget';
 import {
   getAvailableBudgetPeriods,
   calculatePeriodSummary,
@@ -64,7 +64,7 @@ export default function BudgetsPage() {
               shouldIncludeInBudget(transaction, budget)
             );
           })
-          .reduce((sum, transaction) => sum + transaction.amount, 0);
+          .reduce((sum, transaction) => sum + budgetAmount(transaction, budget), 0);
 
         return [budget.id, spent];
       })

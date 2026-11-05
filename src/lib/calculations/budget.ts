@@ -2,6 +2,7 @@
 
 import { addWeeks, addMonths, addYears, differenceInDays, startOfDay, endOfDay } from 'date-fns';
 import type { Budget } from '../db/schema';
+import { amountInCategory, categoryLines, hasCategory, type SplitPart } from '../ledger/ledger';
 
 /**
  * Calculate the current budget period dates
@@ -120,14 +121,16 @@ export function getBudgetStatusColor(progress: number): {
  * @returns Map of category_id to total spent
  */
 export function calculateCategorySpending(
-  transactions: Array<{ category_id: string; amount: number; type: string }>
+  transactions: Array<{ category_id: string; amount: number; type: string; splits?: SplitPart[] | null }>
 ): Map<string, number> {
   const spending = new Map<string, number>();
 
   for (const transaction of transactions) {
-    if (transaction.type === 'expense') {
-      const current = spending.get(transaction.category_id) || 0;
-      spending.set(transaction.category_id, current + transaction.amount);
+    if (transaction.type !== 'expense') continue;
+    // A split transaction counts each part in its own category.
+    for (const line of categoryLines(transaction)) {
+      if (!line.category_id) continue;
+      spending.set(line.category_id, (spending.get(line.category_id) || 0) + line.amount);
     }
   }
 
@@ -161,7 +164,9 @@ export function shouldIncludeInBudget(
   transaction: {
     type: string;
     category_id: string;
+    amount: number;
     exclude_from_budget: boolean;
+    splits?: SplitPart[] | null;
   },
   budget: Budget
 ): boolean {
@@ -173,8 +178,16 @@ export function shouldIncludeInBudget(
   if (transaction.type === 'transfer') return false;
 
   if (budget.category_id) {
-    if (transaction.category_id !== budget.category_id) return false;
+    if (!hasCategory(transaction, budget.category_id)) return false;
   }
 
   return true;
+}
+
+/** How much of the transaction counts towards the budget: only its part in the category, if split. */
+export function budgetAmount(
+  transaction: { category_id: string; amount: number; subcategory_id?: string; splits?: SplitPart[] | null },
+  budget: Budget
+): number {
+  return budget.category_id ? amountInCategory(transaction, budget.category_id) : transaction.amount;
 }

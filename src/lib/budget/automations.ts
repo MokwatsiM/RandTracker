@@ -1,6 +1,7 @@
 import { adjustForWorkingDay, nextOccurrence } from '@/lib/schedules/dates';
 import type { Schedule } from '@/lib/schedules/types';
 import { cycleEnd, cyclesUntil, previousCycleStart } from './cycles';
+import { categoryLines, type SplitPart } from '@/lib/ledger/ledger';
 
 /** How a category's amount is worked out each cycle. Stored in budgets.template. */
 /** 'manual' means the category is set by hand and left out of filling. */
@@ -39,6 +40,8 @@ export function perCycle(amount: number, period: Automation['period']): number {
 
 interface SpendingTransaction {
   category_id?: string;
+  subcategory_id?: string;
+  splits?: SplitPart[] | null;
   type: 'income' | 'expense' | 'transfer';
   amount: number;
   date: string;
@@ -57,9 +60,11 @@ export function averageSpending(
   for (let i = 0; i < cycles; i++) from = previousCycleStart(payday, from);
   const totals = new Map<string, number>();
   for (const t of transactions) {
-    if (t.type !== 'expense' || t.is_deleted || t.exclude_from_budget || !t.category_id) continue;
+    if (t.type !== 'expense' || t.is_deleted || t.exclude_from_budget) continue;
     if (t.date < from || t.date >= start) continue;
-    totals.set(t.category_id, (totals.get(t.category_id) ?? 0) + t.amount);
+    for (const line of categoryLines({ ...t, category_id: t.category_id ?? '' })) {
+      if (line.category_id) totals.set(line.category_id, (totals.get(line.category_id) ?? 0) + line.amount);
+    }
   }
   return new Map([...totals].map(([id, total]) => [id, Math.round(total / cycles)]));
 }

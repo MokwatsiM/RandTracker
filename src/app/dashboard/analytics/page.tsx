@@ -11,6 +11,7 @@ import { BarChart } from '@/components/analytics/BarChart';
 import { LineChart } from '@/components/analytics/LineChart';
 import { formatZAR } from '@/lib/currency';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { useTransactionStore } from '@/stores/transactionStore';
 
 export default function AnalyticsPage() {
   const user = useUserStore((state) => state.user);
@@ -35,6 +36,27 @@ export default function AnalyticsPage() {
   const [incomeBreakdown, setIncomeBreakdown] = useState<CategoryBreakdown[]>([]);
   const [spendingTrend, setSpendingTrend] = useState<SpendingTrend[]>([]);
   const [savingsRate, setSavingsRate] = useState<number>(0);
+  const { transactions, loadTransactions } = useTransactionStore();
+
+  useEffect(() => {
+    if (user) loadTransactions(user.id);
+  }, [user, loadTransactions]);
+
+  // Spending per tag over the chosen range. A transaction with several tags counts under each.
+  const tagSpending = (() => {
+    const months = { '1m': 1, '3m': 3, '6m': 6, '12m': 12 }[timeRange];
+    const from = format(startOfMonth(subMonths(new Date(), months - 1)), 'yyyy-MM-dd');
+    const to = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+    const totals = new Map<string, { amount: number; count: number }>();
+    for (const t of transactions) {
+      if (t.type !== 'expense' || t.is_deleted || t.date < from || t.date > to) continue;
+      for (const tag of t.tags ?? []) {
+        const entry = totals.get(tag) ?? { amount: 0, count: 0 };
+        totals.set(tag, { amount: entry.amount + t.amount, count: entry.count + 1 });
+      }
+    }
+    return [...totals].sort((a, b) => b[1].amount - a[1].amount);
+  })();
 
   useEffect(() => {
     if (user) {
@@ -375,6 +397,28 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Spending by tag</CardTitle>
+          <CardDescription>Expenses over the same period, by tag. A transaction with several tags counts under each.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {tagSpending.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">No tagged expenses in this period. Add tags to transactions, or #tags in their notes.</p>
+          ) : (
+            <div className="divide-y">
+              {tagSpending.map(([tag, { amount, count }]) => (
+                <div key={tag} className="flex items-center justify-between py-2 text-sm">
+                  <span className="font-medium">#{tag}</span>
+                  <span className="text-muted-foreground">{count} transaction{count === 1 ? '' : 's'}</span>
+                  <span className="font-medium">{formatZAR(amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

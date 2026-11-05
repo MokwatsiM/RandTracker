@@ -22,6 +22,8 @@ import { useRuleStore } from '@/stores/ruleStore';
 import { useScheduleStore } from '@/stores/scheduleStore';
 import { firstOccurrenceFrom, nextOccurrence } from '@/lib/schedules/dates';
 import type { ScheduleDraft, ScheduleFrequency } from '@/lib/schedules/types';
+import { mergeTags, splitProblem, tagsInText } from '@/lib/ledger/ledger';
+import { useToastStore } from '@/stores/toastStore';
 import { applyRules } from '@/lib/rules/engine';
 import type { RuleSubject } from '@/lib/rules/types';
 import { useUserStore } from '@/stores/userStore';
@@ -49,6 +51,10 @@ const getInitialFormData = (transaction?: Transaction) => ({
   is_recurring: transaction?.is_recurring || false,
   recurrence_frequency: transaction?.recurrence_frequency || 'monthly',
   recurrence_end_date: transaction?.recurrence_end_date || '',
+  is_split: Boolean(transaction?.splits?.length),
+  splits: (transaction?.splits ?? []).map((s) => ({ category_id: s.category_id, amount: (s.amount / 100).toString() })),
+  tags: (transaction?.tags ?? []).join(', '),
+  cleared: transaction?.cleared ?? false,
 });
 
 export function TransactionDialog({ open, onOpenChange, transaction }: TransactionDialogProps) {
@@ -63,6 +69,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
   const [formData, setFormData] = useState(getInitialFormData(transaction));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   // Rules only fill in the category until the user picks one themselves.
   const [categoryTouched, setCategoryTouched] = useState(false);
 
@@ -70,6 +77,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
   useEffect(() => {
     setFormData(getInitialFormData(transaction));
     setCategoryTouched(false);
+    setFormError(null);
   }, [transaction, open]);
 
   useEffect(() => {
@@ -193,11 +201,33 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
+    setFormError(null);
+
+    const amountInCents = Math.round(parseFloat(formData.amount || '0') * 100);
+    const splitting = formData.is_split && formData.type !== 'transfer';
+    const splits = splitting
+      ? formData.splits.map((s) => ({ category_id: s.category_id, amount: Math.round(parseFloat(s.amount || '0') * 100) }))
+      : null;
+    if (splits) {
+      const problem = splitProblem(amountInCents, splits);
+      if (problem) {
+        setFormError(problem);
+        return;
+      }
+    }
+
+    // A reconciled transaction already matches a bank statement.
+    if (
+      transaction?.reconciled &&
+      (amountInCents !== transaction.amount || formData.date !== transaction.date || formData.account_id !== transaction.account_id) &&
+      !window.confirm('This transaction was reconciled against a statement. Changing its amount, date or account will make the account disagree with that statement. Change it anyway?')
+    ) {
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      const amountInCents = Math.round(parseFloat(formData.amount || '0') * 100);
       const principalPortionInCents = Math.min(
         amountInCents,
         Math.max(
@@ -212,13 +242,17 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
         amount: amountInCents,
         date: formData.date,
         account_id: formData.account_id,
-        category_id: formData.category_id || '',
-        subcategory_id: formData.subcategory_id || undefined,
+        category_id: splits ? '' : formData.category_id || '',
+        subcategory_id: splits ? undefined : formData.subcategory_id || undefined,
+        splits,
+        // Tags typed in notes as #tag are added too.
+        tags: mergeTags(formData.tags.split(','), tagsInText(formData.notes)),
+        cleared: formData.cleared,
         title: formData.title || 'Transaction',
         notes: formData.notes || undefined,
         transfer_account_id: formData.type === 'transfer' ? formData.transfer_account_id : undefined,
         is_recurring: formData.is_recurring,
-        is_subscription: false,
+        is_subscription: transaction?.is_subscription ?? false,
         is_debt_payment: formData.type === 'expense' ? formData.is_debt_payment : false,
         debt_id:
           formData.type === 'expense' && formData.is_debt_payment && formData.debt_id
@@ -229,7 +263,7 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
             ? principalPortionInCents
             : undefined,
         is_paid: true,
-        exclude_from_budget: false,
+        exclude_from_budget: transaction?.exclude_from_budget ?? false,
       };
 
       // Add recurrence rule if recurring
@@ -240,6 +274,11 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
       if (transaction) {
         await updateTransaction(transaction.id, transactionData);
+        const original = transaction;
+        useToastStore.getState().show('Transaction saved.', {
+          label: 'Undo',
+          run: () => updateTransaction(original.id, original),
+        });
         await learnFromEdit(transaction, transactionData);
       } else if (formData.is_recurring) {
         await createRepeating(transactionData);
@@ -359,6 +398,85 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
 
           {/* Category (not for transfers) */}
           {formData.type !== 'transfer' && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.is_split}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    is_split: e.target.checked,
+                    splits:
+                      e.target.checked && formData.splits.length === 0
+                        ? [
+                            { category_id: formData.category_id, amount: formData.amount },
+                            { category_id: '', amount: '' },
+                          ]
+                        : formData.splits,
+                  })
+                }
+              />
+              Split across categories
+            </label>
+          )}
+
+          {formData.type !== 'transfer' && formData.is_split && (
+            <div className="space-y-2 rounded-lg border p-3">
+              {formData.splits.map((part, i) => (
+                <div key={i} className="grid grid-cols-[1fr_7rem_auto] gap-2">
+                  <Select
+                    value={part.category_id}
+                    onChange={(e) => {
+                      const splits = [...formData.splits];
+                      splits[i] = { ...part, category_id: e.target.value };
+                      setFormData({ ...formData, splits });
+                    }}
+                    aria-label={`Category for part ${i + 1}`}
+                  >
+                    <option value="">Category...</option>
+                    {filteredCategories.map((category) => (
+                      <option key={category.id} value={category.id}>{category.icon} {category.name}</option>
+                    ))}
+                  </Select>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={part.amount}
+                    onChange={(e) => {
+                      const splits = [...formData.splits];
+                      splits[i] = { ...part, amount: e.target.value };
+                      setFormData({ ...formData, splits });
+                    }}
+                    aria-label={`Amount for part ${i + 1}`}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={formData.splits.length <= 2}
+                    onClick={() => setFormData({ ...formData, splits: formData.splits.filter((_, j) => j !== i) })}
+                    aria-label={`Remove part ${i + 1}`}
+                  >
+                    ×
+                  </Button>
+                </div>
+              ))}
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <Button type="button" variant="outline" size="sm" onClick={() => setFormData({ ...formData, splits: [...formData.splits, { category_id: '', amount: '' }] })}>
+                  Add part
+                </Button>
+                <span>
+                  {splitProblem(
+                    Math.round(parseFloat(formData.amount || '0') * 100),
+                    formData.splits.map((s) => ({ category_id: s.category_id, amount: Math.round(parseFloat(s.amount || '0') * 100) }))
+                  ) ?? 'Parts add up to the total'}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {formData.type !== 'transfer' && !formData.is_split && (
             <>
               <div>
                 <Label htmlFor="category_id">Category</Label>
@@ -484,6 +602,25 @@ export function TransactionDialog({ open, onOpenChange, transaction }: Transacti
               placeholder="Additional details..."
             />
           </div>
+
+          {/* Tags */}
+          <div>
+            <Label htmlFor="tags">Tags (optional)</Label>
+            <Input
+              id="tags"
+              value={formData.tags}
+              onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
+              placeholder="e.g. work, holiday"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Separate with commas. #tags written in notes are added too.</p>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={formData.cleared} onChange={(e) => setFormData({ ...formData, cleared: e.target.checked })} />
+            Cleared (shown on a bank statement)
+          </label>
+
+          {formError && <p className="text-sm text-red-600">{formError}</p>}
 
           {/* Recurring Transaction */}
           {/* Only for new transactions; existing schedules are managed on the Schedules page. */}

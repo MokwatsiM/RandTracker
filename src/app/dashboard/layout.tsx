@@ -7,6 +7,7 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { FAB } from '@/components/layout/FAB';
 import { QuickAddSheet } from '@/components/transactions/QuickAddSheet';
 import { SchedulePoster } from '@/components/schedules/SchedulePoster';
+import { Toaster } from '@/components/ui/toaster';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function DashboardLayout({
@@ -47,6 +48,8 @@ export default function DashboardLayout({
 
       {/* Quick Add Transaction Sheet */}
       <QuickAddSheet open={quickAddOpen} onOpenChange={setQuickAddOpen} />
+
+      <Toaster />
     </div>
   );
 }

@@ -224,7 +224,29 @@ Add a `template jsonb` column to `budgets` and a **Fill budget** button that wri
 
 Automations run in priority order and never assign more than the money to budget. Each category shows a ring that fills as its target is met, in green, amber or red.
 
-## Phase 4: Ledger features
+## Phase 4: Ledger features (done, November 2026)
+
+**What shipped:**
+- **Migration 018:** split transactions, `cleared` and `reconciled`, `cleared_balance()` and `reconcile_account()`, a GIN index on tags, and `user_profiles.saved_filters`. It also adds the `transaction_lines` view, which the category reports, `get_category_breakdown` and `budget_month` now read.
+- **Transaction dialog:** split across categories (parts must add up), tags (plus #tags typed in notes), a cleared tick, a warning before changing a reconciled transaction, and undo after saving.
+- **Transactions page:**
+  - filters for amount range, cleared, uncategorised and tags (has any or has all), plus saved filters
+  - search that covers the bank description and #tags
+  - a selection checkbox with bulk set category (which teaches rules), add tag, mark cleared or not cleared, and delete, each with undo
+  - 100 rows drawn at a time
+- **Account page:** a running balance on each row, cleared and reconciled marks, and a Reconcile panel. You tick what the statement shows until the difference is zero, then lock those transactions in.
+- **Analytics:** a spending-by-tag report.
+- **Imports:** imported rows are marked cleared.
+- **Tests:** the ledger helpers (splits, tags, balances and filters) are unit-tested.
+
+**Differences from the plan below:**
+- **How splits are stored:** splits are a `splits` JSON column on the transaction rather than child rows. The transaction stays one row, so every balance and total stays correct without changes. Only spending by category reads the parts, through `transaction_lines`.
+- **Paging:** the transactions page pages its rows in the browser rather than querying the server per page. The store already holds the full list for the other pages, so drawing 100 rows at a time is what keeps long histories fast. Server-side paging would only pay off once no page needs the full list.
+- **Fixed on the way:**
+  - The category reports counted deleted transactions.
+  - Rows showed a subcategory's ID instead of its name.
+  - Editing a transaction cleared its "exclude from budget" and "subscription" flags.
+
 
 ### 4.1 Split transactions (M)
 

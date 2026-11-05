@@ -290,6 +290,8 @@ export function StatementUploadDialog({ open, onOpenChange }: StatementUploadDia
           tags: r.tags,
           imported_payee: r.importedPayee,
           imported_id: r.importedId,
+          // It came from the bank, so the bank has shown it.
+          cleared: true,
           schedule_id: r.schedule?.id,
           schedule_date: r.schedule?.date,
           is_paid: true,

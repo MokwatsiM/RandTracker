@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { formatZAR } from '@/lib/currency';
 import { format, parseISO } from 'date-fns';
 import type { Budget, Transaction, Category, Account } from '@/lib/db/schema';
-import { shouldIncludeInBudget } from '@/lib/calculations/budget';
+import { shouldIncludeInBudget, budgetAmount } from '@/lib/calculations/budget';
 import { ReceiptText, TrendingDown, Calendar, Tag } from 'lucide-react';
 
 interface BudgetTransactionsDialogProps {
@@ -45,8 +45,9 @@ export function BudgetTransactionsDialog({
   }, [budget, transactions, periodStart, periodEnd]);
 
   const totalSpent = useMemo(() => {
-    return budgetTransactions.reduce((sum, txn) => sum + txn.amount, 0);
-  }, [budgetTransactions]);
+    if (!budget) return 0;
+    return budgetTransactions.reduce((sum, txn) => sum + budgetAmount(txn, budget), 0);
+  }, [budgetTransactions, budget]);
 
   if (!budget) return null;
 
