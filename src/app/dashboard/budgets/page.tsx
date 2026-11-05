@@ -21,6 +21,7 @@ import { BudgetDialog } from '@/components/budgets/BudgetDialog';
 import { BudgetCard } from '@/components/budgets/BudgetCard';
 import { BudgetHistoryView } from '@/components/budgets/BudgetHistoryView';
 import { BudgetTransactionsDialog } from '@/components/budgets/BudgetTransactionsDialog';
+import { BudgetMonthView } from '@/components/budgets/BudgetMonthView';
 import { useAccountStore } from '@/stores/accountStore';
 
 export default function BudgetsPage() {
@@ -31,7 +32,8 @@ export default function BudgetsPage() {
   const { accounts, loadAccounts } = useAccountStore();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<Budget | undefined>();
-  const [viewMode, setViewMode] = useState<'current' | 'history'>('current');
+  // The budget month is the main view; the per-budget views are still a click away.
+  const [viewMode, setViewMode] = useState<'month' | 'current' | 'history'>('month');
   const [transactionsDialogOpen, setTransactionsDialogOpen] = useState(false);
   const [selectedBudgetForTransactions, setSelectedBudgetForTransactions] = useState<Budget | null>(null);
 
@@ -125,29 +127,35 @@ export default function BudgetsPage() {
           <h1 className="text-3xl font-bold">Budgets</h1>
           <p className="text-muted-foreground">Manage your spending limits and track progress</p>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={viewMode === 'history' ? 'default' : 'outline'}
-            onClick={() => setViewMode(viewMode === 'current' ? 'history' : 'current')}
-          >
-            {viewMode === 'current' ? (
-              <>
-                <History className="mr-2 h-4 w-4" />
-                View History
-              </>
-            ) : (
-              <>
-                <Calendar className="mr-2 h-4 w-4" />
-                Current Period
-              </>
-            )}
-          </Button>
-          <Button onClick={handleCreateBudget}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Budget
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex rounded-md border p-0.5" role="tablist">
+            {([['month', 'Budget month'], ['current', 'Budgets'], ['history', 'History']] as const).map(([mode, label]) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={viewMode === mode ? 'default' : 'ghost'}
+                role="tab"
+                aria-selected={viewMode === mode}
+                onClick={() => setViewMode(mode)}
+              >
+                {mode === 'history' ? <History className="mr-2 h-4 w-4" /> : mode === 'current' ? <Calendar className="mr-2 h-4 w-4" /> : null}
+                {label}
+              </Button>
+            ))}
+          </div>
+          {viewMode !== 'month' && (
+            <Button onClick={handleCreateBudget}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Budget
+            </Button>
+          )}
         </div>
       </div>
+
+      {viewMode === 'month' ? (
+        <BudgetMonthView />
+      ) : (
+      <>
 
       {/* Period Selector for History View */}
       {viewMode === 'history' && (
@@ -251,6 +259,9 @@ export default function BudgetsPage() {
             </div>
           )}
         </>
+      )}
+
+      </>
       )}
 
       <BudgetDialog

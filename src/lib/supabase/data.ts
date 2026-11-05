@@ -92,6 +92,7 @@ type RemoteBudget = {
   rollover_unused: boolean | null;
   alert_threshold: number | null;
   is_active: boolean | null;
+  template: Budget['template'];
   created_at: string;
   updated_at: string;
 };
@@ -227,6 +228,7 @@ function mapBudget(budget: RemoteBudget): Budget {
     rollover_unused: budget.rollover_unused ?? false,
     alert_threshold: budget.alert_threshold ?? 80,
     is_active: budget.is_active ?? true,
+    template: budget.template ?? null,
     created_at: budget.created_at,
     updated_at: budget.updated_at,
   };
@@ -672,6 +674,51 @@ export async function fetchScheduleOccurrences(
   return found;
 }
 
+export interface BudgetMonthCategory {
+  category_id: string;
+  assigned: number;
+  spent: number;
+  carried: number;
+  available: number;
+  rollover: boolean;
+}
+
+export interface BudgetMonth {
+  cycle_start: string;
+  cycle_end: string;
+  payday: number;
+  income: number;
+  assigned: number;
+  to_budget: number;
+  overspent_last_cycle: number;
+  categories: BudgetMonthCategory[];
+}
+
+/** The figures for the payday cycle containing `date`, worked out by the database. */
+export async function fetchBudgetMonth(date: string): Promise<BudgetMonth> {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase.rpc('budget_month', { p_date: date });
+  if (error) {
+    throw error;
+  }
+  return data as BudgetMonth;
+}
+
+/** Saves assigned amounts for one cycle in a single request. */
+export async function saveAllocations(userId: string, cycleStart: string, amounts: Map<string, number>): Promise<void> {
+  if (amounts.size === 0) {
+    return;
+  }
+  const supabase = getSupabaseClient();
+  const { error } = await supabase.from('budget_allocations').upsert(
+    [...amounts].map(([category_id, amount]) => ({ user_id: userId, category_id, cycle_start: cycleStart, amount })),
+    { onConflict: 'user_id,category_id,cycle_start' }
+  );
+  if (error) {
+    throw error;
+  }
+}
+
 export async function fetchSchedules(userId: string): Promise<Schedule[]> {
   const supabase = getSupabaseClient();
   const { data, error } = await supabase
@@ -939,6 +986,7 @@ export async function createBudgetRecord(
       rollover_unused: budget.rollover_unused,
       alert_threshold: budget.alert_threshold,
       is_active: budget.is_active,
+      template: budget.template ?? null,
     })
     .select('*')
     .single<RemoteBudget>();
@@ -964,6 +1012,7 @@ export async function updateBudgetRecord(id: string, updates: Partial<Budget>): 
       rollover_unused: updates.rollover_unused,
       alert_threshold: updates.alert_threshold,
       is_active: updates.is_active,
+      template: updates.template,
     })
     .eq('id', id)
     .select('*')

@@ -119,6 +119,8 @@ export interface Budget {
   rollover_unused: boolean;
   alert_threshold: number;
   is_active: boolean;
+  /** How the budget month fills this category; null means its fixed amount. */
+  template?: import('@/lib/budget/automations').BudgetTemplate | null;
   created_at: string;
   updated_at: string;
 }

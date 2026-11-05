@@ -184,7 +184,21 @@ Transactions get a `schedule_id` column.
 - **Find schedules:** detect repeating payees in history with a regular interval and similar amounts, and suggest them as schedules.
 - **Links to existing features:** debt minimum payments become schedules with a `debt_id`. Subscriptions become schedules with `is_subscription`, shown on a "Subscriptions" summary with monthly and yearly cost.
 
-## Phase 3: Monthly budget view based on payday
+## Phase 3: Monthly budget view based on payday (done, November 2026)
+
+**What shipped:**
+- **Migration 017:** adds `budget_allocations` (row-level security, limited to the user's own categories), `budgets.template`, and the payday cycle functions. It also adds `budget_month(date)`, which works out a cycle's income, assigned, money to budget and overspending, plus carried, spent and available per category, across every earlier cycle.
+- **Payday cycles:** a cycle starts on payday, or the working day before it when payday falls on a weekend or South African public holiday.
+- **Budgets page:** now opens on the budget month. The older Budgets and History views are tabs.
+- **Editing amounts:** you can edit what's assigned to each category. Fill budget fills the empty ones, and "Overwrite with automations" replaces them.
+- **Automations:** each category can have a fixed amount, its average spending over N cycles, its scheduled payments, a goal by its date, a percentage of income, or be set by hand. Each also has a priority, a "keep at most" cap, and carry-over.
+- **Progress rings:** a ring per category shows progress towards its automation's target.
+- **Tests:** the cycle and automation rules are unit-tested, and the SQL cycle functions were checked against the same cases.
+
+**Differences from the plan below:**
+- **Carry-over:** a category's leftover carries over only when "carry unused money over" (`rollover_unused`) is on. Otherwise it goes back to be budgeted again. Overspending always comes out of the next cycle.
+- **Spent:** a category's spending counts expenses only, so refunds recorded as income don't reduce it.
+
 
 ### 3.1 A budget month built on existing budgets (L)
 
