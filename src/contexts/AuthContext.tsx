@@ -58,6 +58,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: {
           full_name: fullName,
         },
+        // The confirmation email's link signs the user in through here.
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
     return { error };
