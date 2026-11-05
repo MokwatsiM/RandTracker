@@ -119,16 +119,9 @@ scripts/backup-from-vps.sh root@your-server
 
 ### Email
 
-No SMTP is configured yet, so new accounts are confirmed automatically and password reset emails can't be sent. To turn email on, add these to `.env` on the server, then run `up -d auth`:
+Auth emails go through Resend's SMTP relay from `noreply@mokwatsi.tech`. The free plan allows 100 emails a day and 3,000 a month, and sending pauses once a limit is reached. New accounts must confirm their email before signing in. The domain's DKIM, SPF and DMARC records are in Cloudflare.
 
-```env
-SMTP_HOST=smtp.example.com
-SMTP_PORT=587
-SMTP_USER=your-user
-SMTP_PASS=your-password
-SMTP_ADMIN_EMAIL=noreply@mokwatsi.tech
-ENABLE_EMAIL_AUTOCONFIRM=false
-```
+The `SMTP_*` settings and the Resend key are in `.env` on the server. After changing them, run `up -d auth`. To let people sign in without confirming, for example while Resend is down, set `ENABLE_EMAIL_AUTOCONFIRM=true` and run the same command.
 
 ### Database admin
 
